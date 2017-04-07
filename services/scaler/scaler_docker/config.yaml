@@ -9,3 +9,6 @@ LOGGING:
     root:
         level: DEBUG
         handlers: [console]
+    nameko:
+        level: DEBUG
+        handlers: [console]

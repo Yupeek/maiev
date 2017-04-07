@@ -9,9 +9,9 @@ WORKDIR /app
 ARG USERID=1000
 ARG GROUPID=$USERID
 
-RUN addgroup -g $GROUPID service &&  adduser -D -u $USERID -G service service
+RUN addgroup -g $GROUPID service;  adduser -D -u $USERID -G $(getent group $GROUPID | cut -d: -f1) service
 
-RUN apk add --no-cache gcc linux-headers musl-dev make curl nodejs
+RUN apk add --no-cache gcc linux-headers musl-dev make nodejs
 
 COPY ./requirements.txt /app/
 COPY scale_info.sh /usr/bin/scale_info
@@ -25,7 +25,7 @@ ADD ./Makefile.inc.tmp /Makefile.inc
 RUN make build
 
 # cleanup after build
-RUN apk del gcc linux-headers curl
+RUN apk del gcc linux-headers make
 
 USER service
 CMD ["nameko", "run", "--config", "config.yaml", "scaler_docker"]

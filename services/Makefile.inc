@@ -4,9 +4,10 @@ IMAGE_NAME ?= $(shell basename $(CURDIR))
 SERVICE_NAME ?= $(IMAGE_NAME)
 CURRENT_MAKEFILE := $(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 DOCKER_REPO ?= docker.exemple.com
+GROUPID ?= $(shell id -g)
 
 help:
-	grep -Ph '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+	@grep -Ph '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
 clean:
 	rm -rf node_modules || /bin/true
@@ -17,7 +18,7 @@ clean:
 
 build-image:  ## build this image docker
 	cp $(CURRENT_MAKEFILE) $(CURDIR)/Makefile.inc.tmp  # copy common Makefile to include it in docker context
-	@docker build -t $(IMAGE_NAME) --build-arg USERID=$(shell id -u) --build-arg GROUPID=$(shell id -g) .
+	@docker build -t $(IMAGE_NAME) --build-arg USERID=$(shell id -u) --build-arg GROUPID=$(GROUPID) .
 	rm $(CURDIR)/Makefile.inc.tmp
 
 # === DEPLOY DOCKER IMAGE
@@ -50,10 +51,7 @@ print_info:
 	@ip addr | grep 'state UP' -A2 | tail -n1 | awk '{print $2}' | cut -f1  -d'/'
 
 dev: print_info install-tools ## target to run inside a docker container to auto reload the sources.
-
-	 ./node_modules/.bin/concurrently --color -c "black.bgWhite,cyan,red"   \
-		"test -f webpack.config.js && ./node_modules/.bin/webpack --watch" \
-	 	"./node_modules/.bin/supervisor -w . -e py -n error -x nameko -- run --config config.yaml $(SERVICE_NAME)"
+	./run_dev.sh
 
 # === META
 

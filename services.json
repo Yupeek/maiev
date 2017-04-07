@@ -17,13 +17,14 @@
         "--rm", "-i",
         "-v", "{current_dir}:/app",
         "-v", "{root}/services/Makefile.inc:/Makefile.inc",
+        "{extra_volume}",
         "-e", "SERVICE_NAME={service_name}",
         "-e FORCE_COLOR=true",
         "--network={networkname}",
         "--link", "rabbitmq:rabbitmq",
         "--name={docker_name}",
         "{service_name}",
-        "make", "dev"],
+        "/app/run_dev.sh"],
       "execStop": ["/usr/bin/docker", "stop", "{docker_name}"],
       "dependency": [
         "rabbitmq"
