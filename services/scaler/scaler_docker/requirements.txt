@@ -1,0 +1,4 @@
+nameko==2.4.4
+https://github.com/eventlet/eventlet/archive/f266be30f5c3ff1889e9ac3f0bad698a49d40e99.zip
+watchdog
+promise==2.0b1
