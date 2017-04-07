@@ -1,0 +1,42 @@
+{
+  "services": [
+    {
+      "name": "rabbitmq",
+      "exec" : [ "/usr/bin/docker", "run",
+        "-i",
+        "--rm",
+        "-P",
+        "--name=rabbitmq",
+        "--network={networkname}",
+        "rabbitmq:3-management"],
+      "execStop": [ "/usr/bin/docker", "stop", "rabbitmq"]
+    },
+    {
+      "name": "docker",
+      "exec" : ["/usr/bin/docker", "run",
+        "--rm", "-i",
+        "-v", "{current_dir}:/app",
+        "-v", "{root}/services/Makefile.inc:/Makefile.inc",
+        "-e", "SERVICE_NAME={service_name}",
+        "-e FORCE_COLOR=true",
+        "--network={networkname}",
+        "--link", "rabbitmq:rabbitmq",
+        "--name={docker_name}",
+        "{service_name}",
+        "make", "dev"],
+      "execStop": ["/usr/bin/docker", "stop", "{docker_name}"],
+      "dependency": [
+        "rabbitmq"
+      ],
+      "abstract": true
+    }
+  ],
+  "context": {
+    "service_name": "{dirname}",
+    "docker_name": "Dev-{service_name}",
+    "networkname": "maiev"
+  },
+  "discover": [
+    "services"
+  ]
+}
