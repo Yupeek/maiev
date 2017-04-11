@@ -1,0 +1,19 @@
+LOGGING:
+  version: 1
+  formatters:
+    simple:
+      format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    colored:
+
+
+  handlers:
+    console:
+      class: logging.StreamHandler
+      formatter: colored
+  loggers:
+    overseer:
+      level: DEBUG
+      handlers: [console]
+    components:
+      level: DEBUG
+      handlers: [console]

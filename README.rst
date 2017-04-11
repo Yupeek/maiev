@@ -20,3 +20,16 @@ what it does not do:
 
 
 
+this system is based en plugins to monitor images and load. currently, it support docker and rabbitmq.
+
+the plugins that manage the images and the deployment of the services are called `scaler`.
+
+the plugins that monitor the load are called a `monitorer`.
+
+
+docker scaller
+==============
+
+the docker scaller use docker swarm to manage the service. in truth, it offload all the work to swarm, just
+giving a interface with it to update the running services.
+

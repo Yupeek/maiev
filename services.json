@@ -5,7 +5,8 @@
       "exec" : [ "/usr/bin/docker", "run",
         "-i",
         "--rm",
-        "-P",
+        "-p", "15672:15672",
+        "-p", "5672:5672",
         "--name=rabbitmq",
         "--network={networkname}",
         "rabbitmq:3-management"],
@@ -22,6 +23,7 @@
         "-e FORCE_COLOR=true",
         "--network={networkname}",
         "--link", "rabbitmq:rabbitmq",
+        "{extra_link}",
         "--name={docker_name}",
         "{service_name}",
         "/app/run_dev.sh"],
@@ -34,8 +36,10 @@
   ],
   "context": {
     "service_name": "{dirname}",
-    "docker_name": "Dev-{service_name}",
-    "networkname": "maiev"
+    "docker_name": "{service_name}",
+    "networkname": "maiev-dev",
+    "extra_link": "",
+    "extra_volume": ""
   },
   "discover": [
     "services"

@@ -15,7 +15,7 @@ LOGGING:
       class: logging.StreamHandler
       formatter: colored
   loggers:
-    scarel_info:
+    overseer:
       level: DEBUG
       handlers: [console]
     components:

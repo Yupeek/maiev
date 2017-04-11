@@ -25,8 +25,10 @@ ADD ./Makefile.inc.tmp /Makefile.inc
 RUN make build
 
 # cleanup after build
-RUN apk del gcc linux-headers curl
+ARG CLEAN=true
+RUN test ! "$CLEAN" = "true"  ||  apk del gcc linux-headers curl
+
 
 USER service
-CMD ["nameko", "run", "--config", "config.yaml", "manager_orchestration"]
+CMD ["nameko", "run", "--config", "config.yaml", "overseer_orchestration"]
 

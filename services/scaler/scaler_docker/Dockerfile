@@ -25,7 +25,8 @@ ADD ./Makefile.inc.tmp /Makefile.inc
 RUN make build
 
 # cleanup after build
-RUN apk del gcc linux-headers make
+ARG CLEAN=true
+RUN test ! "$CLEAN" = "true"  || apk del gcc linux-headers
 
 USER service
 CMD ["nameko", "run", "--config", "config.yaml", "scaler_docker"]

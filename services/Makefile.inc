@@ -3,8 +3,9 @@
 IMAGE_NAME ?= $(shell basename $(CURDIR))
 SERVICE_NAME ?= $(IMAGE_NAME)
 CURRENT_MAKEFILE := $(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
-DOCKER_REPO ?= docker.exemple.com
+DOCKER_REPO ?= localhost
 GROUPID ?= $(shell id -g)
+CLEAN_BUILD ?= true
 
 help:
 	@grep -Ph '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
@@ -18,7 +19,12 @@ clean:
 
 build-image:  ## build this image docker
 	cp $(CURRENT_MAKEFILE) $(CURDIR)/Makefile.inc.tmp  # copy common Makefile to include it in docker context
-	@docker build -t $(IMAGE_NAME) --build-arg USERID=$(shell id -u) --build-arg GROUPID=$(GROUPID) .
+	@docker build \
+		-t $(IMAGE_NAME) \
+		--build-arg USERID=$(shell id -u) \
+		--build-arg GROUPID=$(GROUPID) \
+		--build-arg CLEAN=$(CLEAN_BUILD) \
+		.
 	rm $(CURDIR)/Makefile.inc.tmp
 
 # === DEPLOY DOCKER IMAGE
