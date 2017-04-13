@@ -15,7 +15,7 @@ LOGGING:
       class: logging.StreamHandler
       formatter: colored
   loggers:
-    overseer:
+    scaler_docker:
       level: DEBUG
       handlers: [console]
     components:

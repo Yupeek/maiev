@@ -4,7 +4,8 @@ import logging
 
 from nameko.events import EventDispatcher, SERVICE_POOL, event_handler
 from nameko.rpc import rpc, RpcProxy
-from nameko.timer import timer
+
+from common.utils import log_all, once
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +31,6 @@ class Overseer(object):
     list_service(): list[Service]
     update_metric(metric, value)
     
-    
-    
     """
     name = 'overseer'
     dispatch = EventDispatcher()
@@ -40,21 +39,18 @@ class Overseer(object):
     :type: scaler_docker.ScalerDocker
     """
     services = [
-        {
-            "name": "my-web",
-            "image_name": 'nginx',
-            "type": "docker",
-        }
+
     ]
 
     type_to_scaler = {
-        "docker": "scale_docker",
+        "docker": "scaler_docker",
     }
     reversed_type_to_scaler = {b:a for a,b in type_to_scaler.items()}
 
     @event_handler(
-        "scaler_docker", "image_updated", handler_type=SERVICE_POOL, reliable_delivery=True
+        "scaler_docker", "image_updated", handler_type=SERVICE_POOL, reliable_delivery=False
     )
+    @log_all
     def on_image_update(self, payload):
         """
         each time an image is updated
@@ -75,9 +71,19 @@ class Overseer(object):
                 image_id=payload['image_id']
             )
 
-    @timer(1)
-    def test(self):
-        logger.debug("coucou")
+    @once
+    @log_all
+    def fetch_services(self):
+        services = []
+        result = self.scaler_docker.list_services()
+        for service in result:
+            services.append({
+                "service_name": service['name'],
+                "image_name": service['image'],
+                "type": "docker",
+            })
+        self.services[:] = services
+        logger.debug("services actual : %s", self.services)
 
     @rpc
     def deploy(self, service):

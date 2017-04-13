@@ -1,37 +1,16 @@
 # -*- coding: utf-8 -*-
 
-import logging
-
 import json
-import types
-from functools import wraps, partial
+import logging
 
 from nameko.events import EventDispatcher
 from nameko.rpc import rpc
 from nameko.web.handlers import http
 
 from components.dependency.docker import DockerClientProvider
+from common.utils import log_all
 
 logger = logging.getLogger(__name__)
-
-
-def log_all(meth_or_ignore_excpt=None, ignore_exceptions=(SystemExit, )):
-    if isinstance(meth_or_ignore_excpt, types.FunctionType):
-        meth = meth_or_ignore_excpt
-        @wraps(meth)
-        def wrapper(*args, **kwargs):
-            try:
-                return meth(*args, **kwargs)
-            except ignore_exceptions:
-                raise
-            except Exception:
-                logger.exception("error on %s", meth.__name__)
-                raise
-    else:
-        # gave exceptions
-        ignore_exceptions = meth_or_ignore_excpt or ignore_exceptions
-        return partial(log_all, ignore_exceptions=ignore_exceptions)
-    return wrapper
 
 
 def split_envs(envs_from_docker):
@@ -45,6 +24,21 @@ def split_envs(envs_from_docker):
     :return: 
     """
     return dict(a.split('=') for a in envs_from_docker)
+
+
+def parse_full_id(image_full):
+    if '@' in image_full:
+        rest, digest = image_full.split('@')
+    else:
+        rest, digest = image_full, None
+    if ':' in rest:
+        splited = rest.split(':')
+        image_name_with_repo, tag = "".join(splited[:-1]), splited[-1]
+    else:
+        image_name_with_repo, tag = rest, 'latest'
+    image_name = image_name_with_repo.split("/")[-1]
+
+    return image_name, tag, digest
 
 
 class ScalerDocker(object):
@@ -87,6 +81,7 @@ class ScalerDocker(object):
             data = json.loads(request.get_data(as_text=True))
             for event in data['events']:
                 target = event['target']
+
                 if event['action'] == 'push':
                     event_payload = {
                         "from": self.name,
@@ -105,6 +100,7 @@ class ScalerDocker(object):
         return 200, ''
 
     @rpc
+    @log_all
     def upgrade(self, service_name, image_id):
         """
         update the given service 
@@ -112,9 +108,10 @@ class ScalerDocker(object):
         :param image_id: 
         :return: 
         """
+        logger.debug("upgrading %s to %s", service_name, image_id)
         service = self._get(service_name=service_name)
 
-        service.update(image=image_id)
+        service.update_preserve(image=image_id, name=service.name)
 
     @rpc
     @log_all(ValueError)
@@ -141,14 +138,16 @@ class ScalerDocker(object):
                   - dict[str, str] list of envs
                 
         
-        :rtype: list[(str, str, dict[str, str])] 
+        :rtype: list[dict[str, str|dict]] 
         """
+        logger.debug("current service list : %d" % len(self.docker.services.list()))
         return [
-            (
-                s.name,
-                s.attrs['Spec']['TaskTemplate']['ContainerSpec']['Image'],
-                split_envs(s.attrs['Spec']['TaskTemplate']['ContainerSpec']['Env'])
-            ) for s in self.docker.services.list()
+            {
+                'name': s.name,
+                'image': parse_full_id(s.attrs['Spec']['TaskTemplate']['ContainerSpec']['Image'])[0],
+                'envs':split_envs(s.attrs['Spec']['TaskTemplate']['ContainerSpec'].get('Env', []))
+            }
+            for s in self.docker.services.list()
         ]
 
     def _get(self, service_id=None, service_name=None):
@@ -156,13 +155,17 @@ class ScalerDocker(object):
         fetch the docker api service from the backend
         :param str service_name: the name of the service 
         :param str service_id: the Id of the service
-        :return: the service 
+        :return: the service or None
         :rtype: docker.models.services.Service
         """
         if service_id:
             service = self.docker.services.get(service_id)
         elif service_name:
-            service = self.docker.services.list(service_name=service_name)[0]
+            services = self.docker.services.list(filters=dict(name=service_name))
+            if services:
+                service = services[0]
+            else:
+                service = None
         else:
             raise ValueError("can't get a service without eiter his name or his id")
         return service

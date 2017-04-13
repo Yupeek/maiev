@@ -1,5 +1,4 @@
 # Created by .ignore support plugin (hsz.mobi)
-### Python template
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -156,3 +155,6 @@ typings/
 
 
 assets/
+
+Makefile  # skip this makefile sinnce it's a base image. further makefile
+services.json

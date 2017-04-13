@@ -3,7 +3,9 @@ from __future__ import absolute_import, print_function, unicode_literals
 
 import logging
 from docker import client
+
 from nameko.extensions import DependencyProvider
+
 
 logger = logging.getLogger(__name__)
 
@@ -20,4 +22,3 @@ class DockerClientProvider(DependencyProvider):
 
     def get_dependency(self, worker_ctx):
         return self.client
-

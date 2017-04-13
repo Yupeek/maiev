@@ -1,10 +1,10 @@
-GROUPID ?= $(shell getent group docker | cut -d: -f3)
 
-include ../../Makefile.inc
+include ../Makefile.inc
 
 
 build-image:  ## build this image docker
 	@docker build \
 		-t $(IMAGE_NAME) \
+		--build-arg USERID=$(shell id -u) \
 		--build-arg GROUPID=$(GROUPID) \
 		.

@@ -9,7 +9,5 @@
 
     "extra_volume": "-v=/var/run/docker.sock:/var/run/docker.sock"
   },
-  "discover": [
-    "registry_docker"
-  ]
+  "discover": []
 }

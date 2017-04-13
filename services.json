@@ -16,8 +16,9 @@
       "name": "docker",
       "exec" : ["/usr/bin/docker", "run",
         "--rm", "-i",
-        "-v", "{current_dir}:/app",
-        "-v", "{root}/services/Makefile.inc:/Makefile.inc",
+        "-v", "{current_dir}/app:/app",
+        "-v", "{root}/services/maiev-base/app/common/:/app/common",
+        "-v", "{root}/services/maiev-base/run_dev.sh:/run_dev.sh",
         "{extra_volume}",
         "-e", "SERVICE_NAME={service_name}",
         "-e FORCE_COLOR=true",
@@ -26,7 +27,7 @@
         "{extra_link}",
         "--name={docker_name}",
         "{service_name}",
-        "/app/run_dev.sh"],
+        "/run_dev.sh"],
       "execStop": ["/usr/bin/docker", "stop", "{docker_name}"],
       "dependency": [
         "rabbitmq"
