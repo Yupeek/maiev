@@ -2,9 +2,9 @@
 .DEFAULT_GOAL := all
 SUBDIRS := $(shell find services -not -path "*node_modules*" -and  -name Makefile | xargs "dirname" )
 .PHONY: clean $(SUBDIRS)
-DOCKER_REPO ?= localhost:5000
 NETWORK_NAME ?= maiev
 LOCAL_IP ?= $(shell ip a s | awk '/inet /{print $$2}' | grep -v 127.0.0.1 | head -n 1 |  cut -d/ -f 1)
+DOCKER_REPO ?= $(LOCAL_IP):5000
 
 help:
 	@grep -P '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'

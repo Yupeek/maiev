@@ -29,4 +29,4 @@ deploy:
 
 # === META
 
-all: build
+all: build-image

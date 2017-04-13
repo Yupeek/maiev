@@ -3,7 +3,8 @@ INSTALLATION
 
 
 Maiev use a micro-service architecture to manage other micro-services. this lead to exploding it to many docker images
-that will comunicate via rabbitmq.
+that will communicate via rabbitmq. this micro-service pattern lead to many way to deploy it, and so the folowing setup
+is just a small example of a working setup.
 
 
 the minimal setup must be reached to make it possible to deploy other part. this minimal setup is:
@@ -47,7 +48,7 @@ the minimal setup must be reached to make it possible to deploy other part. this
 	the scaler_docker service must have access to the swarm manager node. this lead to a further configuration for the
 	manager node by adding ``-H tcp://0.0.0.0:2375 `` to the dockerd arguments
 
-- a running docker repository configured to push to notify scaler-docker
+- a running docker repository configured to notify push to scaler-docker
 
 .. code:: bash
 
@@ -56,7 +57,7 @@ the minimal setup must be reached to make it possible to deploy other part. this
 .. note::
 
 	the embeding of the repository in the swarm is possible for easy setup, but will be a problem for production.
-	the swarm node must access the repository, so the port 5000 is natively published.
+	the swarm node must access the repository, so the port 5000 is published.
 	if this repository is not secure, you must start docker with ``--insecure-registry docker_swarm_node:5000`` on all
 	docker that will push to it (and then trigger the upgrade in the swarm)
 
@@ -80,11 +81,27 @@ to test this arch, there is a fast way to setup Maiev via the embed makefile.
 
 	the name «localdocker» must resolve to your public ip
 
+	.. code:: bash
+
+		echo "$(ip a s | awk '/inet /{print $2}' | grep -v 127.0.0.1 | head -n 1 |  cut -d/ -f 1) localdocker" >> /etc/hosts
+
+create a local repository in which we will temporary store the buildt maiev images
+
 .. code:: bash
 
-	docker run -d --name registry -p 5000:5001 registry:2
+	docker run -d --rm --name registry -p 5001:5000 registry:2
 
+build all images and deploy them in the new buildt repository
 
+.. code:: bash
+
+	DOCKER_REPO=localhost:5001 make install
+
+now all the stack is ok, we can remove the registry
+
+.. code:: bash
+
+	docker stop registry
 
 Docker full integration
 ***********************
