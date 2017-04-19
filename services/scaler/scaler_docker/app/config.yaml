@@ -21,3 +21,6 @@ LOGGING:
     components:
       level: DEBUG
       handlers: [console]
+    common:
+      level: DEBUG
+      handlers: [console]

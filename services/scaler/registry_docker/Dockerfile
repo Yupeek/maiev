@@ -6,7 +6,7 @@ RUN echo $'notifications:\n\
   endpoints:\n\
     - name: docker-scaler\n\
       url: http://scaler_docker:8000/event\n\
-      timeout: 500ms\n\
+      timeout: 250ms\n\
       threshold: 5\n\
-      backoff: 1s\n'\
+      backoff: 10s\n'\
 >> /etc/docker/registry/config.yml
