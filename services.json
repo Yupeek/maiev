@@ -60,6 +60,7 @@
     "extra_volume": ""
   },
   "discover": [
-    "services"
+    "services",
+    "test"
   ]
 }

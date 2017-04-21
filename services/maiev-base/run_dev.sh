@@ -38,7 +38,7 @@ asyncRun() {
         wait
     done
 }
-
+asyncRun pip freeze
 
 asyncRun npm install --prefix /app_dev supervisor concurrently
 

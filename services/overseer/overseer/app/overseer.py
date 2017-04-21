@@ -15,7 +15,6 @@ from common.entrypoint import once
 logger = logging.getLogger(__name__)
 
 
-
 class Overseer(object):
     """
     the main orchestation service
