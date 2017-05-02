@@ -5,9 +5,8 @@ from nameko.events import EventDispatcher
 from nameko.rpc import rpc
 from nameko.timer import timer
 
-from common.entrypoint import once
 from common.utils import log_all
-from components.dependency.rabbitmq import RabbitMq
+from service.dependency.rabbitmq import RabbitMq
 
 logger = logging.getLogger(__name__)
 
@@ -72,8 +71,11 @@ class MonitorerRabbitmq(object):
 
     def _compute_queue(self, qname):
         data = self.rabbitmq.get_queue_stats(qname, columns='message_stats,messages_ready,consumers')
-
-        stats_ = data['message_stats']
+        try:
+            stats_ = data['message_stats']
+        except KeyError:
+            logger.exception("bad format from rabbitmq data: %r", data)
+            raise
         prate, drate = stats_['publish_details']['rate'], stats_['deliver_details']['rate']
         empty_rate = drate - prate
         try:

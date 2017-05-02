@@ -29,15 +29,15 @@
         "--network={networkname}",
         "rabbitmq:3-management"],
       "execStop": [ "/usr/bin/docker", "stop", "rabbitmq"],
-      "type": "mq"
+      "type": "infra"
     },
     {
       "name": "docker",
       "exec" : ["/usr/bin/docker", "run",
         "--rm", "-i",
-        "-v", "{current_dir}/app:/app",
-        "-v", "{root}/services/maiev-base/app/common/:/app/common",
-        "-v", "{root}/services/maiev-base/run_dev.sh:/run_dev.sh",
+        "-v", "{root}/services/maiev-base/app/common/:/app/common:ro",
+        "-v", "{root}/services/maiev-base/run_dev.sh:/run_dev.sh:ro",
+        "-v", "{current_dir}/app/service:/app/service:ro",
         "{extra_volume}",
         "-e", "SERVICE_NAME={service_name}",
         "-e FORCE_COLOR=true",

@@ -3,15 +3,15 @@
 import json
 import logging
 
+import docker.errors
 import eventlet
 from docker.types.services import ServiceMode
 from nameko.events import EventDispatcher
 from nameko.rpc import rpc
 from nameko.web.handlers import http
 
-from components.dependency.docker import DockerClientProvider
 from common.utils import log_all
-import docker.errors
+from service.dependency.docker import DockerClientProvider
 
 logger = logging.getLogger(__name__)
 

@@ -17,7 +17,8 @@
         "/usr/bin/docker",
         "stop",
         "{docker_name}"
-      ]
+      ],
+      "type": "infra"
     }
   ],
   "context": {

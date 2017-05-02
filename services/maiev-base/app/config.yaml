@@ -1,11 +1,6 @@
 AMQP_URI: amqp://${RABBITMQ_USER:guest}:${RABBITMQ_PASSWORD:guest}@${RABBITMQ_HOST:localhost}
 WEB_SERVER_ADDRESS: '0.0.0.0:8000'
 
-MONITORED_SERVER_URL: ${MONITORED_SERVER_URL:http://${RABBITMQ_USER:guest}:${RABBITMQ_PASSWORD:guest}@${RABBITMQ_HOST:localhost}/api}
-
-parent_calls_tracked: 10
-max_workers: 10
-
 LOGGING:
   version: 1
   formatters:
@@ -20,7 +15,7 @@ LOGGING:
       class: logging.StreamHandler
       formatter: colored
   loggers:
-    consumer:
+    service:
       level: DEBUG
       handlers: [console]
     components:

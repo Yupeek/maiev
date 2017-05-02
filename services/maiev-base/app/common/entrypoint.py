@@ -22,6 +22,7 @@ class Once(Entrypoint):
         pass
 
     def _run(self):
+        logger.debug("will spawn worker soon")
         sleep(1)
         self.container.spawn_worker(self, self.args, self.kwargs)
 

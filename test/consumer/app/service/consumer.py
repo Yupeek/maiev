@@ -4,7 +4,6 @@ import logging
 import eventlet
 import itertools
 from nameko.rpc import RpcProxy
-from nameko.timer import timer
 
 from common.entrypoint import once
 
@@ -49,6 +48,7 @@ class Consumer(object):
 
     @once
     def start(self):
+        logger.debug("starting query ")
         count = 0
         tot = 0
         maxi = 5000
