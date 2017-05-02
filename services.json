@@ -15,7 +15,8 @@
         "name": "{service_name}_{engine_name}",
         "image_name": "health_{engine_name}"
       },
-      "abstract": true
+      "abstract": true,
+      "type": "db"
     },
     {
       "name": "rabbitmq",
@@ -27,7 +28,8 @@
         "--name=rabbitmq",
         "--network={networkname}",
         "rabbitmq:3-management"],
-      "execStop": [ "/usr/bin/docker", "stop", "rabbitmq"]
+      "execStop": [ "/usr/bin/docker", "stop", "rabbitmq"],
+      "type": "mq"
     },
     {
       "name": "docker",
@@ -46,10 +48,11 @@
         "{service_name}",
         "/run_dev.sh"],
       "execStop": ["/usr/bin/docker", "stop", "{docker_name}"],
-      "dependency": [
+      "require": [
         "rabbitmq"
       ],
-      "abstract": true
+      "abstract": true,
+      "type": "Wr"
     }
   ],
   "context": {

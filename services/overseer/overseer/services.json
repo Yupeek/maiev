@@ -5,15 +5,20 @@
       "extends": "docker",
       "context": {
         "extra_link": "--link=overseer_mongodb"
-      }
-    },
-    {
-      "name": "overseer_mongodb",
-      "extends": "docker-db",
-      "retry": 2,
-      "context": {
-        "engine_name": "mongodb"
-      }
+      },
+      "require": [
+        "super()",
+        "scaler_docker",
+        {
+          "name": "overseer_mongodb",
+          "type": "db",
+          "extends": "docker-db",
+          "retry": 2,
+          "context": {
+            "engine_name": "mongodb"
+          }
+        }
+      ]
     }
   ]
 }

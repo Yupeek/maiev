@@ -3,6 +3,7 @@
     {
       "name": "{dirname}",
       "extends": "docker",
+      "type": "test",
       "context": {
 
       }

@@ -2,11 +2,14 @@
   "services": [
     {
       "name": "{dirname}",
-      "extends": "docker"
+      "extends": "docker",
+      "require": [
+        "super()",
+        "registry_docker"
+      ]
     }
   ],
   "context": {
-
     "extra_volume": "-v=/var/run/docker.sock:/var/run/docker.sock"
   },
   "discover": []
