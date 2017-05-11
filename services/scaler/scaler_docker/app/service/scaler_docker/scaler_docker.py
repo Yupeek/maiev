@@ -5,6 +5,7 @@ import logging
 
 import docker.errors
 import eventlet
+from common.dependency import PoolProvider
 from docker.types.services import ServiceMode
 from nameko.events import EventDispatcher
 from nameko.rpc import rpc
@@ -119,6 +120,10 @@ class ScalerDocker(object):
     """
     :type: docker.client.DockerClient
     """
+    pool = PoolProvider()
+    """
+    :type: eventlet.greenpool.GreenPool
+    """
 
     @http('POST', '/event')
     @log_all
@@ -128,6 +133,8 @@ class ScalerDocker(object):
         :param werkzeug.wrappers.Request request: the request 
         :return: 
         """
+        logger.debug("data from request: %s", request.get_data(as_text=True))
+
         @log_all
         def propagate_events():
             try:
@@ -154,8 +161,7 @@ class ScalerDocker(object):
                         logger.debug("dispatching %s", event_payload)
             except Exception:
                 logger.exception("error while receiving docker push notification")
-
-        eventlet.spawn(propagate_events)
+        self.pool.spawn(propagate_events)
 
         return ''
 

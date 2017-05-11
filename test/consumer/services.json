@@ -6,7 +6,12 @@
       "type": "test",
       "context": {
 
-      }
+      },
+      "require": [
+        "super()",
+        "producer"
+
+      ]
     }
   ]
 }

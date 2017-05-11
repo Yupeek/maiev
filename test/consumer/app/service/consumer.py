@@ -3,6 +3,8 @@ import logging
 
 import eventlet
 import itertools
+
+from common.utils import log_all
 from nameko.rpc import RpcProxy
 
 from common.entrypoint import once
@@ -47,6 +49,7 @@ class Consumer(object):
     # ####################################################
 
     @once
+    @log_all
     def start(self):
         logger.debug("starting query ")
         count = 0

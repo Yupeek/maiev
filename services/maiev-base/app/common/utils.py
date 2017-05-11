@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import absolute_import, print_function, unicode_literals
 
 import datetime
 import logging
@@ -15,14 +14,20 @@ def log_all(meth_or_ignore_excpt=None, ignore_exceptions=(SystemExit, )):
 
         meth = meth_or_ignore_excpt
         logger = logging.getLogger(meth.__module__ or __name__)
+
         @wraps(meth)
         def wrapper(*args, **kwargs):
             try:
                 return meth(*args, **kwargs)
             except ignore_exceptions:
                 raise
-            except Exception:
-                logger.exception("error on %s", meth.__name__)
+            except Exception as e:
+                try:
+                    msg = 'error with call %s(args=%r, kwargs=%r) : %s' % (meth.__name__, args, kwargs, e)
+                except Exception:
+                    msg = 'error with call %s(args unavailable) : %s' % (meth.__name__, e,)
+
+                logger.exception(msg, extra={'call': {'args': args, 'kwargs': kwargs}})
                 raise
     else:
         # gave exceptions
