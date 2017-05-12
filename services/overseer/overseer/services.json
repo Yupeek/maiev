@@ -9,6 +9,7 @@
       "require": [
         "super()",
         "scaler_docker",
+        "trigger",
         {
           "name": "overseer_mongodb",
           "type": "db",

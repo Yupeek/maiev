@@ -1,6 +1,8 @@
 AMQP_URI: amqp://${RABBITMQ_USER:guest}:${RABBITMQ_PASSWORD:guest}@${RABBITMQ_HOST:localhost}
 WEB_SERVER_ADDRESS: '0.0.0.0:8000'
 
+serializer: json_datecompatible
+
 LOGGING:
   version: 1
   formatters:

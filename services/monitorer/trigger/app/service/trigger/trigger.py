@@ -3,9 +3,10 @@ import datetime
 import logging
 from functools import partial
 
+import pymongo
 import pyparsing
 import pytz
-from booleano.operations.operands.constants import Constant, Number
+from booleano.operations.operands.constants import Constant
 from booleano.operations.variables import DurationVariable, BooleanVariable
 from booleano.parser.core import EvaluableParseManager
 from booleano.parser.grammar import Grammar
@@ -15,19 +16,19 @@ from common.entrypoint import once
 from common.utils import log_all, filter_dict
 from nameko.events import event_handler, EventDispatcher
 from nameko.rpc import rpc
-from typing import Dict, List, Any
-
 
 logger = logging.getLogger(__name__)
-
-Rule = Dict[str, str]
 
 
 # TODO: check for ming to apply a structure to our db
 # http://ming.readthedocs.io/en/latest/userguide.html
+
 TYPINGS = """
 from typing import Dict, List, Any
 import datetime
+
+Rule = Dict[str, str]
+
 
 RuleSet = {
     "id": str,  # id of the rule (for db udpate)
@@ -37,7 +38,7 @@ RuleSet = {
         {
             "name": str,  # the name of the ressource (given by the service,
                           # used for expression reference ie: «mq:latency»)
-            "monitorer": str,  # name of the monitorer that provide this ressource (monitorer-rabbitmq)
+            "monitorer": str,  # name of the monitorer that provide this ressource (monitorer_rabbitmq)
             "identifier": str,  # the identifier used by the monitorer. can be meaningless to us
             "history": {
                 "last_metrics": Dict[str, Any],  # the last metrics for thir resources
@@ -99,7 +100,8 @@ def get_since(ctx, rule_name, rule):
 
 
 def get_now():
-    return datetime.datetime.now(pytz.utc)
+    # cant be offset aware from now, since mongodb don't support it
+    return datetime.datetime.now()
 
 
 def get_rule_result(ctx, rule_name, rule):
@@ -172,19 +174,53 @@ class Trigger(object):
     # ####################################################
 
     @once
+    @log_all
     def create_index(self):
-        self.mongo.rulesets.create_index({
-            'owner': 1,
-            'name': 1
-        }, {
-            'unique': True,
-            'background': True
+        self.mongo.rulesets.create_index([
+            ('owner', pymongo.ASCENDING),
+            ('name', pymongo.ASCENDING),
+        ],
+            unique=True,
+            background=True
+        )
+
+        self.add({
+            'owner': 'overseer',
+            'name': 'stable_producer',
+            'resources': [
+                {
+                    'name': 'rmq',
+                    'monitorer': 'monitorer_rabbitmq',
+                    'identifier': 'rpc-producer',
+                }
+            ],
+            'rules': [
+                {
+                    'name': 'latency_ok',
+                    'expression': 'rmq:waiting == 0 or rmq:latency < 0.200'
+                },
+                {
+                    'name': 'latency_fail',
+                    'expression': 'rmq:latency > 5'
+                },
+                {
+                    'name': 'panic',
+                    'expression': 'rmq:latency > 10 or (rules:latency_fail and rules:latency_fail:since > "25s")'
+                },
+                {
+                    'name': 'stable_latency',
+                    'expression': 'rules:latency_ok and rules:latency_ok:since > "30s"'
+                }
+            ]
         })
+
+
+
+
 
     # ####################################################
     #                 EVENTS
     # ####################################################
-
 
     @event_handler(
         "monitorer_rabbitmq", "metrics_updated", reliable_delivery=False
@@ -214,14 +250,17 @@ class Trigger(object):
                 if results is None:
                     logger.debug("not enouth metrics to computes the ruleset %s" % ruleset['name'])
                 else:
+                    updated = False
                     for rule in ruleset['rules']:
-                        self._save_rules_results(ruleset, rule, results[rule['name']])
-                    event_payload = {
-                        'ruleset': self._validate_ruleset(ruleset),
-                        'rules_stats': results
-                    }
-                    logger.debug("triggering event 'ruleset_trigger' %s" % event_payload)
-                    self.dispatch('ruleset_triggered', event_payload)
+                        updated = self._save_rules_results(ruleset, rule, results[rule['name']]) or updated
+                    # if one rule has been saved (and so changed the history)
+                    if updated:
+                        event_payload = {
+                            'ruleset': self._validate_ruleset(ruleset),
+                            'rules_stats': results
+                        }
+                        logger.debug("triggering event 'ruleset_trigger' %s" % results)
+                        self.dispatch('ruleset_triggered', event_payload)
 
     # ####################################################
     #                 RPC
@@ -324,7 +363,6 @@ class Trigger(object):
     #                 PRIVATE
     # ####################################################
 
-
     def _save_metrics(self, ruleset, ressource, metrics):
         """
         save the metric in the history of resource in ruleset
@@ -333,6 +371,8 @@ class Trigger(object):
         :param metrics: the metric to save into the bases.
         :return: 
         """
+        if ressource.get('history', {}).get('last_metrics') == metrics:
+            return False
         ressource['history'] = {
             'last_metrics': metrics,
             'date': get_now()
@@ -347,22 +387,31 @@ class Trigger(object):
                 }
             }
         )
+        return True
 
     def _save_rules_results(self, ruleset, rule, result):
+        """
+        save the rule result and the current date if this result has changed.
+        :param ruleset: the ruleset to save in mongodb
+        :param rule:  the rule to modify by side effect
+        :param result: the current result to save
+        :return: 
+        """
+        if rule.get('history', {}).get('last_result') == result:
+            return False
         rule['history'] = {
             'last_result': result,
             'date': get_now()
         }
-        self.mongo.rulesets.update_one(
-            {
-                '_id': ruleset['_id'],
-                'rules.name': rule['name']
-            }, {
-                "$set": {
-                    "rules.$.history": rule['history']
-                }
-            })
-
+        self.mongo.rulesets.update_one({
+            '_id': ruleset['_id'],
+            'rules.name': rule['name']
+        }, {
+            "$set": {
+                "rules.$.history": rule['history']
+            }
+        })
+        return True
 
     def _validate_ruleset(self, ruleset):
         """
@@ -438,7 +487,7 @@ class Trigger(object):
             # bind to allow "rmq:latency" etc
             root_table.add_subtable(SymbolTable(
                 metric_name,
-                tuple(Bind(k, Number(v)) for k, v in values.items())
+                tuple(Bind(k, Constant(v)) for k, v in values.items())
             ))
         # build the symbol table for all rules (as boolean)
         rules_symbols = SymbolTable('rules', ())

@@ -21,8 +21,8 @@ FIXTURES_RULESETS = [
         'resources': [
             {
                 'name': 'rmq',
-                'monitorer': 'monitorer-rabbitmq',
-                'identifier': 'producer-rcp',
+                'monitorer': 'monitorer_rabbitmq',
+                'identifier': 'rpc-producer',
             }
         ],
         'rules': [
@@ -49,8 +49,8 @@ FIXTURES_RULESETS = [
         'resources': [
             {
                 'name': 'rmq',
-                'monitorer': 'monitorer-rabbitmq',
-                'identifier': 'producer-rcp',
+                'monitorer': 'monitorer_rabbitmq',
+                'identifier': 'rpc-producer',
             }
         ],
         'rules': [
@@ -69,8 +69,8 @@ FIXTURES_RULESETS = [
         'resources': [
             {
                 'name': 'rmq',
-                'monitorer': 'monitorer-rabbitmq',
-                'identifier': 'producer-rcp',
+                'monitorer': 'monitorer_rabbitmq',
+                'identifier': 'rpc-producer',
             }
         ],
         'rules': [
@@ -149,7 +149,7 @@ class TestNoTrigger(TestCase):
                 {
                     'name': 'rmq',
                     'monitorer': 'monitorer_rabbitmq',
-                    'identifier': 'producer-rpc',
+                    'identifier': 'rpc-producer',
                     'history': {
                         "last_metrics": metrics or {},
                         "date": get_now()
@@ -298,7 +298,7 @@ class TestConputeResults(TriggerTestcase):
                 {
                     'name': 'rmq',
 
-                    'identifier': 'producer-rcp',
+                    'identifier': 'rpc-producer',
                 }
             ],
             'rules': [
@@ -327,8 +327,8 @@ class TestConputeResults(TriggerTestcase):
             'resources': [
                 {
                     'name': 'rmq',
-                    'monitorer': 'monitorer-rabbitmq',
-                    'identifier': 'producer-rcp',
+                    'monitorer': 'monitorer_rabbitmq',
+                    'identifier': 'rpc-producer',
                 }
             ],
             'rules': [
@@ -348,8 +348,8 @@ class TestConputeResults(TriggerTestcase):
             'resources': [
                 {
                     'name': 'rmq',
-                    'monitorer': 'monitorer-rabbitmq',
-                    'identifier': 'producer-rcp',
+                    'monitorer': 'monitorer_rabbitmq',
+                    'identifier': 'rpc-producer',
                 }
             ],
             'rules': [
@@ -378,8 +378,8 @@ class TestConputeResults(TriggerTestcase):
             'resources': [
                 {
                     'name': 'rmq',
-                    'monitorer': 'monitorer-rabbitmq',
-                    'identifier': 'producer-rcp',
+                    'monitorer': 'monitorer_rabbitmq',
+                    'identifier': 'rpc-producer',
                 }
             ],
             'rules': [
@@ -427,6 +427,16 @@ class TestConputeResults(TriggerTestcase):
                 'rate_up': False,
                 'rate_down': False
             },
+        })
+
+    def test_number_None(self):
+        ruleset = self.fixtures_rulesets[0]
+
+        self.assertEqual(self.service.compute(
+            self.add_history(ruleset, resources={'rmq': [{'latency': None}, 0]})
+        ), {
+            "status": "success",
+            "result":  {'latency_ok': False, 'panic': False, 'stable_latency': False, 'latency_fail': False},
         })
 
     def test_no_ressources_ruleset(self):
@@ -556,8 +566,8 @@ class TestStorageMethods(WithDbTestTrigger):
 class TestEventComputing(WithDbTestTrigger):
     events = [
         {
-            "monitorer": "monitorer-rabbitmq",
-            "identifier": "producer-rcp",
+            "monitorer": "monitorer_rabbitmq",
+            "identifier": "rpc-producer",
             "metrics": {
                 'waiting': 2238,
                 'latency': 25.902,

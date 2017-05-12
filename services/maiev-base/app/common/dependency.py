@@ -7,6 +7,7 @@ from nameko.extensions import DependencyProvider
 
 logger = logging.getLogger(__name__)
 
+
 class PoolProvider(DependencyProvider):
 
     def __init__(self):
@@ -14,10 +15,7 @@ class PoolProvider(DependencyProvider):
         self.poolsize = 10
 
     def setup(self):
-        self.poolsize = self.container.config.get(MAX_WORKERS_CONFIG_KEY)
-
-    def get_default_name(self):
-        return '%s_mongodb' % self.container.service_cls.name
+        self.poolsize = self.container.config.get(MAX_WORKERS_CONFIG_KEY, 10)
 
     def start(self):
         self.pool = eventlet.greenpool.GreenPool(self.poolsize)

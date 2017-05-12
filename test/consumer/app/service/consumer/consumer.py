@@ -64,4 +64,3 @@ class Consumer(object):
 
             tot += count
             logger.debug("{} calls/s".format(count))
-

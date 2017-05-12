@@ -4,7 +4,6 @@ import json
 import logging
 
 import docker.errors
-import eventlet
 from common.dependency import PoolProvider
 from docker.types.services import ServiceMode
 from nameko.events import EventDispatcher

@@ -4,8 +4,17 @@
       "name": "{dirname}",
       "extends": "docker",
       "context": {
+      },
+      "extraData": [
+        {
+          "name": "rabbitmq management",
+          "exec": ["/bin/bash", "-c",
+            "sleep 1 && echo \"http://$(docker inspect rabbitmq | jq -r '.[].NetworkSettings.Networks.\"{networkname}\".IPAddress'):15672/\""
+          ],
+          "type": "link"
+        }
+      ]
 
-      }
     }
   ]
 }

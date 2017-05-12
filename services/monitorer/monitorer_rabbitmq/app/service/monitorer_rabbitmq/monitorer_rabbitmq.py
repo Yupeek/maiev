@@ -63,7 +63,16 @@ class MonitorerRabbitmq(object):
     def print_status(self):
 
         import pprint
-        logger.debug(pprint.pformat(self._compute_queue('rpc-producer')))
+
+        metrics = self._compute_queue('rpc-producer')
+        if metrics is not None:
+
+            logger.debug(pprint.pformat(metrics))
+            self.dispatch("metrics_updated", {
+                'monitorer': "monitorer_rabbitmq",
+                'identifier': 'rpc-producer',
+                'metrics': metrics
+            })
 
     # ####################################################
     #                 PRIVATE
@@ -71,6 +80,9 @@ class MonitorerRabbitmq(object):
 
     def _compute_queue(self, qname):
         data = self.rabbitmq.get_queue_stats(qname, columns='message_stats,messages_ready,consumers')
+        if data is None:
+            logger.debug("queue %s does not exists", qname)
+            return
         try:
             stats_ = data['message_stats']
         except KeyError:

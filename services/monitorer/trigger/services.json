@@ -8,6 +8,7 @@
       },
       "require": [
         "super()",
+        "monitorer_rabbitmq",
         {
           "name": "{dirname}_mongodb",
           "type": "db",
