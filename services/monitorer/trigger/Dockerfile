@@ -13,5 +13,5 @@ RUN apk del gcc linux-headers
 
 
 USER service
-CMD ["nameko", "run", "--config", "config.yaml", "overseer"]
+CMD ["nameko", "run", "--config", "config.yaml", "service.trigger.trigger"]
 

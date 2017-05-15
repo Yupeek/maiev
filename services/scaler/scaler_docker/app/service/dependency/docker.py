@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 
 import logging
+
 from docker import client
-
 from nameko.extensions import DependencyProvider
-
 
 logger = logging.getLogger(__name__)
 

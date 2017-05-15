@@ -29,7 +29,10 @@ class RabbitMqApi(object):
         try:
             return response.json()
         except JSONDecodeError:
-            logger.exception("error while decoding rabbitmq backend response: %s", response.text)
+            logger.exception("error while decoding rabbitmq backend response: GET %s =>  [%d]%r",
+                             final_url,
+                             response.status_code,
+                             response.text)
             raise
 
     def get_queue_stats(self, qname, **extra):
@@ -69,4 +72,3 @@ class RabbitMq(DependencyProvider):
 
     def get_dependency(self, worker_ctx):
         return self.api
-

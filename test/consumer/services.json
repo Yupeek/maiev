@@ -10,7 +10,15 @@
       "require": [
         "super()",
         "producer"
-
+      ],
+      "extraData": [
+        {
+          "name": "trigger other queries",
+          "exec": ["/bin/bash", "-c",
+            "sleep 1 && echo \"http://$(docker inspect {dirname} | jq -r '.[].NetworkSettings.Networks.\"{networkname}\".IPAddress'):8000/\""
+          ],
+          "type": "link"
+        }
       ]
     }
   ]

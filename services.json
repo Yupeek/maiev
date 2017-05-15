@@ -23,13 +23,27 @@
       "exec" : [ "/usr/bin/docker", "run",
         "-i",
         "--rm",
-        "-p", "15672:15672",
-        "-p", "5672:5672",
         "--name=rabbitmq",
         "--network={networkname}",
         "rabbitmq:3-management"],
       "execStop": [ "/usr/bin/docker", "stop", "rabbitmq"],
-      "type": "infra"
+      "type": "infra",
+      "extraData": [
+        {
+          "name": "rabbitmq management",
+          "exec": ["/bin/bash", "-c",
+            "sleep 1 && echo \"http://$(docker inspect rabbitmq | jq -r '.[].NetworkSettings.Networks.\"{networkname}\".IPAddress'):15672/\""
+          ],
+          "type": "link"
+        },
+        {
+          "name": "nameko cmdline",
+          "exec": ["/bin/bash", "-c",
+            "sleep 1 && echo \"nameko shell --broker amqp://guest:guest@$(docker inspect rabbitmq | jq -r '.[].NetworkSettings.Networks.\"{networkname}\".IPAddress')\""
+          ],
+          "type": "string"
+        }
+      ]
     },
     {
       "name": "docker",
@@ -38,6 +52,7 @@
         "-v", "{root}/services/maiev-base/app/common/:/app/common:ro",
         "-v", "{root}/services/maiev-base/run_dev.sh:/run_dev.sh:ro",
         "-v", "{current_dir}/app/service:/app/service:ro",
+        "-v", "{current_dir}/app/scale.json:/app/scale.json:ro",
         "{extra_volume}",
         "-e", "SERVICE_NAME={service_name}",
         "-e FORCE_COLOR=true",

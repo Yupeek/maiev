@@ -14,4 +14,4 @@ ARG GROUPID=1000
 RUN echo addgroup -g $GROUPID docker;  adduser service $(getent group $GROUPID | cut -d: -f1)
 
 USER service
-CMD ["nameko", "run", "--config", "config.yaml", "scaler_docker"]
+CMD ["nameko", "run", "--config", "config.yaml", "service.scaler_docker.scaler_docker"]

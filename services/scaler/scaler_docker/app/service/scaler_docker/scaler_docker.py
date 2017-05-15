@@ -5,12 +5,11 @@ import logging
 
 import docker.errors
 from common.dependency import PoolProvider
+from common.utils import log_all
 from docker.types.services import ServiceMode
 from nameko.events import EventDispatcher
 from nameko.rpc import rpc
 from nameko.web.handlers import http
-
-from common.utils import log_all
 from service.dependency.docker import DockerClientProvider
 
 logger = logging.getLogger(__name__)
@@ -22,9 +21,9 @@ def split_envs(envs_from_docker):
 
     >>> split_envs(['SITENAME=localhost', 'A=bibi']) == {'SITENAME': 'localhost', 'A': 'bibi'}
     True
-    
-    :param envs_from_docker: 
-    :return: 
+
+    :param envs_from_docker:
+    :return:
     """
     return dict(a.split('=') for a in envs_from_docker)
 
@@ -32,14 +31,14 @@ def split_envs(envs_from_docker):
 def parse_full_id(image_full):
     """
     parse the full path of an image and return the splited element:
-    
+
     - repository
     - image name
     - tag
     - digest
-    
+
     :param image_full: the full image (docker.io/image:tag@sha
-    :return: 
+    :return:
     """
 
     if '@' in image_full:
@@ -60,21 +59,20 @@ def parse_full_id(image_full):
         image_name, tag = image_n_tag, 'latest'
 
     result = {'image': image_name, 'repository': repo, 'tag': tag, 'digest': digest}
-    logger.debug("parsed %s into %s", image_full, result)
     return result
 
 
 def recompose_full_id(decomposed):
     """
     recompose the full image identifier from a naive deconstructed data
-    
+
     >>> recompose_full_id({'name': 'nginx'})
     'nginx'
     >>> recompose_full_id({'name': 'nginx', 'repository': 'localdocker:5000/', 'tag': 'latest', \
             'digest': 'sha256:a45a0eda30eb0908edb977d42f2369b78d97cea58ffcde158d5e4d000e076932'})
     'localdocker:5000/nginx@sha256:a45a0eda30eb0908edb977d42f2369b78d97cea58ffcde158d5e4d000e076932'
-    
-    :param decomposed: the dict with decomposed data 
+
+    :param decomposed: the dict with decomposed data
     :return: the full id of an image
     """
     if 'name' not in decomposed:
@@ -86,31 +84,30 @@ def recompose_full_id(decomposed):
         res = '%s:%s' % (res, decomposed['version'])
     if decomposed.get('digest'):
         res = "%s@%s" % (res, decomposed['digest'])
-    logger.debug("recomposed %s into %s ", decomposed, res)
     return res
 
 
 class ScalerDocker(object):
     """
     the docker swarm adapter
-    
+
     emited event
     ############
-    
-    - image_updated(): ScaleConfig 
-     
+
+    - image_updated(): ScaleConfig
+
     subscribe
     #########
-    
+
     None
-    
+
     rcp
     ###
-    
+
     fetch_image_config(image_name: str): ScaleConfig
     scale(service_nane: str, n: int)
     get(service_name: str): list[Instance]
-    
+
     """
     name = 'scaler_docker'
     type = 'docker'
@@ -129,8 +126,8 @@ class ScalerDocker(object):
     def event(self, request):
         """
         entry point for docker repository notification
-        :param werkzeug.wrappers.Request request: the request 
-        :return: 
+        :param werkzeug.wrappers.Request request: the request
+        :return:
         """
         logger.debug("data from request: %s", request.get_data(as_text=True))
 
@@ -147,14 +144,17 @@ class ScalerDocker(object):
                             'from': self.name,
                             'digest': target['digest'],
                             'image_name': target['repository'],
-                            'full_image_id': '%s/%s@%s' % (event['request']['host'], target['repository'], target['digest'])
+                            'full_image_id': '%s/%s@%s' % (event['request']['host'],
+                                                           target['repository'],
+                                                           target['digest'])
                         }
                         if 'tag' in target:
                             event_payload['version'] = target['tag']
                         try:
                             event_payload['scale_config'] = self.fetch_image_config(event_payload['full_image_id'])
                         except docker.errors.DockerException:
-                            logger.exception("error while fetching image config for %s" % event_payload['full_image_id'])
+                            logger.exception("error while fetching image config for %s" %
+                                             event_payload['full_image_id'])
 
                         self.dispatch('image_updated', event_payload)
                         logger.debug("dispatching %s", event_payload)
@@ -169,8 +169,8 @@ class ScalerDocker(object):
     def update(self, service_name, image_id=None, scale=None):
         """
         update the given service with the given image
-        :param image_id: 
-        :return: 
+        :param image_id:
+        :return:
         """
         logger.debug("upgrading %s to %s scale=%s", service_name, image_id, scale)
         service = self._get(service_name=service_name)
@@ -191,9 +191,9 @@ class ScalerDocker(object):
     def get(self, service_id=None, service_name=None):
         """
         retreive a service data by either his name or better: his id
-        :param str service_name: the name of the service 
+        :param str service_name: the name of the service
         :param str service_id: the Id of the service
-        :return: the service 
+        :return: the service
         :rtype: Service
         """
         service = self._get(service_id=service_id, service_name=service_name)
@@ -204,9 +204,9 @@ class ScalerDocker(object):
     def list_services(self):
         """
         list all running service on this cluster.
-        
-        :return: 
-        :rtype: list[dict[str, str|dict]] 
+
+        :return:
+        :rtype: list[dict[str, str|dict]]
         """
         logger.debug("current service list : %d" % len(self.docker.services.list()))
 
@@ -240,7 +240,7 @@ class ScalerDocker(object):
     def _build_service_stat(self, service):
         """
         build the service stats with the folowing values :
-        
+
         - name: name of the service
         - image: the name of the image
         - version: the versio of the image
@@ -249,9 +249,9 @@ class ScalerDocker(object):
         - intances: the list of tasks (runnings or downs)
         - envs: the list of env configured to this service
         - mode: mode, numbers
-        
-        :param service: 
-        :return: 
+
+        :param service:
+        :return:
         """
         image_full_id = service.attrs['Spec']['TaskTemplate']['ContainerSpec']['Image']
         image_data = parse_full_id(image_full_id)
@@ -278,14 +278,13 @@ class ScalerDocker(object):
             'ports': [
                 {'published': d['PublishedPort'],
                  'target': d['TargetPort']
-                 } for d in service.attrs['Endpoint']['Ports']
+                 } for d in service.attrs['Endpoint'].get('Ports', ())
             ],
             'instances': [
                 self._build_task_stats(task) for task in service.tasks()
             ],
             'envs': split_envs(service.attrs['Spec']['TaskTemplate']['ContainerSpec'].get('Env', [])),
             'mode': mode,
-
         }
 
     def _build_task_stats(self, task):
@@ -301,7 +300,7 @@ class ScalerDocker(object):
     def _get(self, service_id=None, service_name=None):
         """
         fetch the docker api service from the backend
-        :param str service_name: the name of the service 
+        :param str service_name: the name of the service
         :param str service_id: the Id of the service
         :return: the service or None
         :rtype: docker.models.services.Service

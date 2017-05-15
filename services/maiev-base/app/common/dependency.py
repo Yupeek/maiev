@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import logging
+
 import eventlet.greenpool
 from nameko.constants import MAX_WORKERS_CONFIG_KEY
 from nameko.extensions import DependencyProvider

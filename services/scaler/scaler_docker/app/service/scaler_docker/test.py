@@ -3,13 +3,11 @@ import json
 import logging
 import unittest
 from unittest import mock
+
 import eventlet.greenpool
 from docker.client import DockerClient
-
 from nameko.testing.services import worker_factory
-from service.dependency.docker import DockerClientProvider
-
-from service.scaler_docker import ScalerDocker
+from service.scaler_docker.scaler_docker import ScalerDocker
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +28,8 @@ class ScalerDockerTestCase(unittest.TestCase):
                     "digest": "sha256:11756e3866c185aa3cc5fa77b912456da847d276e3d55c50eabc6421612a2a1f",
                     "length": 1777,
                     "repository": "nginx",
-                    "url": "http://localdocker:5000/v2/nginx/manifests/sha256:11756e3866c185aa3cc5fa77b912456da847d276e3d55c50eabc6421612a2a1f",
+                    "url": "http://localdocker:5000/v2/nginx/manifests/sha256:11756e3866c185aa3cc5fa77b912456da847d"
+                           "276e3d55c50eabc6421612a2a1f",
                     "tag": "test"},
                 "request": {
                     "id": "7c5ad739-5417-4907-82ad-97eceae39bd3",
@@ -38,7 +37,8 @@ class ScalerDockerTestCase(unittest.TestCase):
                     "host": "localdocker:5000",
                     "method": "PUT",
                     "useragent":
-                        "docker/17.03.1-ce go/go1.7.5 git-commit/c6d412e kernel/4.9.0-2-amd64 os/linux arch/amd64 UpstreamClient(Docker-Client/17.03.1-ce \\(linux\\))"},
+                        "docker/17.03.1-ce go/go1.7.5 git-commit/c6d412e kernel/4.9.0-2-amd64 os/linux arch/amd64 "
+                        "UpstreamClient(Docker-Client/17.03.1-ce \\(linux\\))"},
                 "actor": {},
                 "source": {
 
@@ -61,15 +61,15 @@ class ScalerDockerTestCase(unittest.TestCase):
         pool.waitall()
         service.dispatch.assert_called_once_with(
             'image_updated',
-             {
-                 'from': 'scaler_docker',
-                 'scale_config': {},
-                 'version': 'test',
-                 'full_image_id': 'localdocker:5000/nginx@sha256:11756e3866c185aa3cc5fa77b912456da8'
-                                  '47d276e3d55c50eabc6421612a2a1f',
-                 'image_name': 'nginx',
-                 'digest': 'sha256:11756e3866c185aa3cc5fa77b912456da847d276e3d55c50eabc6421612a2a1f'
-             }
+            {
+                'from': 'scaler_docker',
+                'scale_config': {},
+                'version': 'test',
+                'full_image_id': 'localdocker:5000/nginx@sha256:11756e3866c185aa3cc5fa77b912456da8'
+                                 '47d276e3d55c50eabc6421612a2a1f',
+                'image_name': 'nginx',
+                'digest': 'sha256:11756e3866c185aa3cc5fa77b912456da847d276e3d55c50eabc6421612a2a1f'
+            }
         )
 
     def test_fetch_scale_config(self):
@@ -79,4 +79,3 @@ class ScalerDockerTestCase(unittest.TestCase):
         service = worker_factory(ScalerDocker, docker=fake_provider)  # type: ScalerDocker
         service.fetch_image_config('nginx')
         fake_provider.containers.run.assert_called_once_with('nginx', 'scale_info', remove=True)
-

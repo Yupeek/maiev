@@ -5,17 +5,17 @@ from functools import partial
 
 import pymongo
 import pyparsing
-import pytz
-from booleano.operations.operands.constants import Constant
-from booleano.operations.variables import DurationVariable, BooleanVariable
-from booleano.parser.core import EvaluableParseManager
-from booleano.parser.grammar import Grammar
-from booleano.parser.scope import SymbolTable, Bind
 from common.db.mongo import Mongo
 from common.entrypoint import once
-from common.utils import log_all, filter_dict
-from nameko.events import event_handler, EventDispatcher
+from common.utils import filter_dict, log_all
+from nameko.events import EventDispatcher, event_handler
 from nameko.rpc import rpc
+
+from booleano.operations.operands.constants import Constant
+from booleano.operations.variables import BooleanVariable, DurationVariable
+from booleano.parser.core import EvaluableParseManager
+from booleano.parser.grammar import Grammar
+from booleano.parser.scope import Bind, SymbolTable
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ MetricsPayload = {
 }
 """
 grammar = Grammar(**{
-    "belongs_to":"in",
+    "belongs_to": "in",
     "and": 'and',
     "or": 'or',
     "not": "not",
@@ -88,7 +88,7 @@ def get_since(ctx, rule_name, rule):
     :param ctx:  the context in which the current value is present (or not)
     :param rule_name:  the name of the rule (as inserted into the context)
     :param rule: the rule itself, in whth the history is stored
-    :return: 
+    :return:
     """
     history = rule.get('history', {})
     last_result = history.get("last_result")
@@ -111,7 +111,7 @@ def get_rule_result(ctx, rule_name, rule):
     :param ctx: the context in which the history may be present
     :param rule_name: the name of the rule as used to search in ctx
     :param rule: the rule to use. used to search throught his history
-    :return: 
+    :return:
     """
     result = ctx.get(rule_name)
     if result is None:
@@ -122,29 +122,29 @@ def get_rule_result(ctx, rule_name, rule):
 class Trigger(object):
     """
     a service that will listen to all incoming events and compute them with
-    boolean rules. finaly, it will dispatch events with resulting value. 
-    
+    boolean rules. finaly, it will dispatch events with resulting value.
+
     each rules is pushed by other services.
-    
+
     public events
     #############
-    
+
     - ruleset_value_changed(rules_with_values)
-     
+
     subscribe
     #########
-    
+
     - monitorer_rabbitmq.metirc_update(metrics: dict)
-    
+
     rcp
     ###
-    
+
     compute(Ruleset, values)
     add(Ruleset)
     delete(rule_id)
     purge(owner)
     list(filter)
-    
+
     """
 
     name = 'trigger'
@@ -152,22 +152,20 @@ class Trigger(object):
     """
     :type: pymongo.MongoClient
     the mongo database.
-    
+
     tables
     ######
-    
+
     rulesets
     --------
-    
+
     contains all rulesets in the same database.
-    
+
     must respect :type:`RuleSet`
-    
+
     """
 
     dispatch = EventDispatcher()
-
-
 
     # ####################################################
     #                 ONCE
@@ -184,40 +182,6 @@ class Trigger(object):
             background=True
         )
 
-        self.add({
-            'owner': 'overseer',
-            'name': 'stable_producer',
-            'resources': [
-                {
-                    'name': 'rmq',
-                    'monitorer': 'monitorer_rabbitmq',
-                    'identifier': 'rpc-producer',
-                }
-            ],
-            'rules': [
-                {
-                    'name': 'latency_ok',
-                    'expression': 'rmq:waiting == 0 or rmq:latency < 0.200'
-                },
-                {
-                    'name': 'latency_fail',
-                    'expression': 'rmq:latency > 5'
-                },
-                {
-                    'name': 'panic',
-                    'expression': 'rmq:latency > 10 or (rules:latency_fail and rules:latency_fail:since > "25s")'
-                },
-                {
-                    'name': 'stable_latency',
-                    'expression': 'rules:latency_ok and rules:latency_ok:since > "30s"'
-                }
-            ]
-        })
-
-
-
-
-
     # ####################################################
     #                 EVENTS
     # ####################################################
@@ -228,11 +192,11 @@ class Trigger(object):
     @log_all
     def on_metrics_updated(self, payload):
         """
-        each time monitorer_rabbitmq publish mew metrics, we find if we monitor this data and 
+        each time monitorer_rabbitmq publish mew metrics, we find if we monitor this data and
         then compute the rules against this metrics.
-        
+
         :param MetricsPayload payload: the payload of the event.
-        :return: 
+        :return:
         """
         assert set(payload.keys()) <= {'monitorer', 'identifier', 'metrics'}, \
             'the payload does not contains the required keys'
@@ -270,11 +234,11 @@ class Trigger(object):
     @log_all
     def compute(self, ruleset):
         """
-        compute the ruleset. it will use the history of each metrics to compute the 
-        ruleset. the history can be given along with the ruseset to try 
+        compute the ruleset. it will use the history of each metrics to compute the
+        ruleset. the history can be given along with the ruseset to try
         a custom metrics
-        :param RuleSet ruleset: 
-        :return: 
+        :param RuleSet ruleset:
+        :return:
         """
         try:
             validated_ruleset = self._validate_ruleset(ruleset)
@@ -286,6 +250,16 @@ class Trigger(object):
                 "result": None,
                 "exception_extra": {}
             }
+        except Exception as e:
+            return {
+                "status": "error",
+                "exception": "error : %s" % e,
+                "exception_type": str(type(e).__name__),
+                "result": None,
+                "exception_extra": {k: v for k, v in e.__dict__.items()
+                                    if isinstance(v, (str, float, int)) and k != 'msg'}
+            }
+
         if not validated_ruleset['resources']:
             return {
                 "status": "error",
@@ -302,7 +276,8 @@ class Trigger(object):
                 "exception": str(e),
                 "exception_type": str(type(e).__name__),
                 "result": None,
-                "exception_extra": {k: v for k, v in e.__dict__.items() if isinstance(v, (str, float, int)) and k != 'msg'}
+                "exception_extra": {k: v for k, v in e.__dict__.items()
+                                    if isinstance(v, (str, float, int)) and k != 'msg'}
             }
         else:
             return {
@@ -315,11 +290,12 @@ class Trigger(object):
     def add(self, ruleset):
         """
         add a ruleset into the list of managed ruleset.
-        all ruleset will be keep unique by owner and name. 2 add for the 
+        all ruleset will be keep unique by owner and name. 2 add for the
         same owner and name will replace the existing one
-        :param RuleSet ruleset:  
-        :return: 
+        :param RuleSet ruleset:
+        :return:
         """
+        logger.debug("added ruleset %s", {'owner': ruleset['owner'], 'name': ruleset['name']})
         ruleset = self._validate_ruleset(ruleset)
         self.mongo.rulesets.update(
             {'owner': ruleset['owner'], 'name': ruleset['name']},
@@ -348,7 +324,7 @@ class Trigger(object):
         """
         return all ruleset matching the given filters.
         the filters can be given via keyword, or via the positonal argument _filter.
-        :param dict _filter: like keywords: the search term compatible with pymongo 
+        :param dict _filter: like keywords: the search term compatible with pymongo
         :keyword:  like _filter: the search term compatible with pymongo
         :return: the list of filtered RuleSet
         :rtype: list[RuleSet]
@@ -369,7 +345,7 @@ class Trigger(object):
         :param ruleset: the ruleset to save in mongodb (update)
         :param ressource: the resource to modify by side effect
         :param metrics: the metric to save into the bases.
-        :return: 
+        :return:
         """
         if ressource.get('history', {}).get('last_metrics') == metrics:
             return False
@@ -395,7 +371,7 @@ class Trigger(object):
         :param ruleset: the ruleset to save in mongodb
         :param rule:  the rule to modify by side effect
         :param result: the current result to save
-        :return: 
+        :return:
         """
         if rule.get('history', {}).get('last_result') == result:
             return False
@@ -430,7 +406,7 @@ class Trigger(object):
                     "identifier": ressource['identifier'],
                     "history": {k: v for k, v in ressource.get('history', {}).items() if k in ("last_metrics", "date")}
                 }
-                for ressource in ruleset.get("resources", [])
+                for ressource in (ruleset.get("resources") or ())
             ],
             "rules": [
                 {
@@ -450,9 +426,9 @@ class Trigger(object):
         compute the ruleset with the metrics from the ruleset history
         if a history is not populated, this method will return None,
         and will do so until all resources are populated
-        
+
         :param Ruleset ruleset:  the ruleset fetched for this metrics
-        :return: 
+        :return:
         """
         # build all asked resources for this ruleset
         metrics = {}
@@ -469,11 +445,11 @@ class Trigger(object):
 
     def _solve_rules(self, rules, metrics):
         """
-        solve the rules using the given metrics. 
+        solve the rules using the given metrics.
         metrics must contains all needed metrics.
-        :param list[Rule] rules: the 
-        :param metrics: 
-        :return: 
+        :param list[Rule] rules: the
+        :param metrics:
+        :return:
         :raises:
             pyparsing.ParseException
         """

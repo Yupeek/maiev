@@ -1,17 +1,16 @@
 # -*- coding: utf-8 -*-
 
-import logging
-
 import atexit
+import logging
 import os
+import shutil
 import subprocess
 import tempfile
-import shutil
 import time
-from nameko.extensions import DependencyProvider
 
-from pymongo import MongoClient
 import pymongo.errors
+from nameko.extensions import DependencyProvider
+from pymongo import MongoClient
 
 logger = logging.getLogger(__name__)
 

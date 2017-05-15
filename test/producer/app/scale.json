@@ -1,13 +1,39 @@
 {
-  "min": 1,
-  "max": 1,
+  "min": 0,
+  "max": 9,
   "dependences": {
     "required": [
-
     ],
     "optional": [
     ]
   },
-  "metric": [
-  ]
+  "scale": {
+    "resources": [
+      {
+        "name": "rmq",
+        "monitorer": "monitorer_rabbitmq",
+        "identifier": "rpc-producer"
+      }
+    ],
+    "rules": [
+      {
+        "name": "latency_ok",
+        "expression": "rmq:waiting == 0 or rmq:latency < 0.200"
+      },
+      {
+        "name": "latency_fail",
+        "expression": "rmq:latency > 5"
+      },
+      {
+        "name": "panic",
+        "expression": "rmq:latency > 10 or (rules:latency_fail and rules:latency_fail:since > \"25s\")"
+      },
+      {
+        "name": "stable_latency",
+        "expression": "rules:latency_ok and rules:latency_ok:since > \"30s\""
+      }
+    ],
+    "scale_up": "rules:panic",
+    "scale_down": "rules:stable_latency"
+  }
 }

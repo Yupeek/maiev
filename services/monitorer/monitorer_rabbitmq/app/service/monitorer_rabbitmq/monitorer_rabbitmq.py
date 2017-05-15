@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 import logging
 
+from common.utils import log_all
 from nameko.events import EventDispatcher
 from nameko.rpc import rpc
 from nameko.timer import timer
-
-from common.utils import log_all
 from service.dependency.rabbitmq import RabbitMq
 
 logger = logging.getLogger(__name__)
@@ -13,19 +12,19 @@ logger = logging.getLogger(__name__)
 
 class MonitorerRabbitmq(object):
     """
-    the monitorer that track rabbitmq stats to 
+    the monitorer that track rabbitmq stats to
     report performance issues
-    
+
     public events
     #############
-    
+
     - metric_updated(): Service
-    
+
     rcp
     ###
-    
+
     track(identifier)
-    
+
     """
     name = 'monitorer_rabbitmq'
     dispatch = EventDispatcher()
@@ -40,7 +39,6 @@ class MonitorerRabbitmq(object):
 
     # no events
 
-
     # ####################################################
     #                 RPC
     # ####################################################
@@ -49,8 +47,8 @@ class MonitorerRabbitmq(object):
     def track(self, queue_identifier):
         """
         create a service on the valide scaler
-        :param service: 
-        :return: 
+        :param service:
+        :return:
         """
         logger.debug("will track %s", queue_identifier)
 

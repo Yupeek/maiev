@@ -4,10 +4,12 @@ import logging
 import eventlet
 import itertools
 
+from common.dependency import PoolProvider
 from common.utils import log_all
 from nameko.rpc import RpcProxy
 
 from common.entrypoint import once
+from nameko.web.handlers import http
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +34,10 @@ class Consumer(object):
     producer = RpcProxy('producer')
     """
     :type: producer.Producer
+    """
+    pool = PoolProvider()
+    """
+    :type: eventlet.greenpool.GreenPool
     """
 
     # ####################################################
@@ -64,3 +70,9 @@ class Consumer(object):
 
             tot += count
             logger.debug("{} calls/s".format(count))
+
+    @http('GET', '/')
+    @log_all
+    def trigger(self, request):
+        self.pool.spawn(self.start)
+        return '<html><body><h3>started 5000 queries to Consumer</h3></body></html>'

@@ -19,7 +19,7 @@ the minimal setup must be reached to make it possible to deploy other part. this
 
 .. code:: bash
 
-	docker swarm init
+	docker swarm init  --advertise-addr  $MYADDR
 	docker network create --driver overlay --subnet 10.0.9.0/24 maiev
 
 

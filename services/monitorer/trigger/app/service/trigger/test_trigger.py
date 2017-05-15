@@ -5,11 +5,8 @@ import logging
 from unittest import TestCase
 
 import mock
-import pytz
 from common.db.mongo import MongoTemporaryInstance
-
 from nameko.testing.services import worker_factory
-
 from service.trigger.trigger import Trigger, get_now
 
 logger = logging.getLogger(__name__)
@@ -191,9 +188,7 @@ class TestResolveRulesetsHistory(TriggerTestcase):
         ruleset = self.add_history(
             self.fixtures_rulesets[0],
             resources={
-                'rmq': ({
-                            'latency': 6.8
-                        }, 68)
+                'rmq': ({'latency': 6.8}, 68)
             }
         )
         res = self.service._compute_ruleset(ruleset)
@@ -203,9 +198,7 @@ class TestResolveRulesetsHistory(TriggerTestcase):
         ruleset = self.add_history(
             self.fixtures_rulesets[0],
             resources={
-                'rmq': ({
-                            'latency': 0.1
-                        }, 68)
+                'rmq': ({'latency': 0.1}, 68)
             }
         )
         res = self.service._compute_ruleset(ruleset)
@@ -215,9 +208,7 @@ class TestResolveRulesetsHistory(TriggerTestcase):
         ruleset = self.add_history(
             self.fixtures_rulesets[0],
             resources={
-                'rmq': ({
-                            'latency': 11
-                        }, 68)
+                'rmq': ({'latency': 11}, 68)
             }
         )
         res = self.service._compute_ruleset(ruleset)
@@ -227,9 +218,7 @@ class TestResolveRulesetsHistory(TriggerTestcase):
         ruleset = self.add_history(
             self.fixtures_rulesets[0],
             resources={
-                'rmq': ({
-                            'latency': 6
-                        }, 68)
+                'rmq': ({'latency': 6}, 68)
             },
             rules={
                 'latency_fail': [True, 23]  # fail since 23 sec
@@ -242,9 +231,7 @@ class TestResolveRulesetsHistory(TriggerTestcase):
         ruleset = self.add_history(
             self.fixtures_rulesets[0],
             resources={
-                'rmq': ({
-                            'latency': 6
-                        }, 68)
+                'rmq': ({'latency': 6}, 68)
             },
             rules={
                 'latency_fail': [True, 27]  # fail since 23 sec
@@ -257,9 +244,7 @@ class TestResolveRulesetsHistory(TriggerTestcase):
         ruleset = self.add_history(
             self.fixtures_rulesets[0],
             resources={
-                'rmq': ({
-                            'latency': 0.05
-                        }, 68)
+                'rmq': ({'latency': 0.05}, 68)
             },
             rules={
                 'latency_ok': [True, 33]  # fail since 23 sec
@@ -436,7 +421,7 @@ class TestConputeResults(TriggerTestcase):
             self.add_history(ruleset, resources={'rmq': [{'latency': None}, 0]})
         ), {
             "status": "success",
-            "result":  {'latency_ok': False, 'panic': False, 'stable_latency': False, 'latency_fail': False},
+            "result": {'latency_ok': False, 'panic': False, 'stable_latency': False, 'latency_fail': False},
         })
 
     def test_no_ressources_ruleset(self):

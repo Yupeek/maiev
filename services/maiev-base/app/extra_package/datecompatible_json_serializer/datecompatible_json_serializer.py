@@ -4,9 +4,8 @@ this contains the serializer that will accept a datetime to transmit througth ra
 """
 
 import datetime
-import logging
-
 import json
+import logging
 from time import mktime
 
 logger = logging.getLogger(__name__)
@@ -46,6 +45,7 @@ def datecompatible_dumps(obj):
 # Decoder function
 def datecompatible_loads(obj):
     return json.loads(obj, object_hook=datecompatible_decoder)
+
 
 register_args = (
     datecompatible_dumps,

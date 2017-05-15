@@ -4,4 +4,4 @@ watchdog
 promise==2.0b1
 pymongo
 pytz
-file:///app/extra_package/datecompatible_json_serializer/
+./extra_package/datecompatible_json_serializer/
