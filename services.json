@@ -19,6 +19,15 @@
       "type": "db"
     },
     {
+      "name": "mongodb",
+      "type": "db",
+      "extends": "docker-db",
+      "retry": 2,
+      "context": {
+        "engine_name": "mongodb"
+      }
+    },
+    {
       "name": "rabbitmq",
       "exec" : [ "/usr/bin/docker", "run",
         "-i",
@@ -58,6 +67,7 @@
         "-e FORCE_COLOR=true",
         "--network={networkname}",
         "--link", "rabbitmq:rabbitmq",
+        "--link", "maiev_mongodb:maiev_mongodb",
         "{extra_link}",
         "--name={docker_name}",
         "{service_name}",

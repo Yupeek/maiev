@@ -3,22 +3,11 @@
     {
       "name": "{dirname}",
       "extends": "docker",
-      "context": {
-        "extra_link": "--link=overseer_mongodb"
-      },
       "require": [
         "super()",
         "scaler_docker",
         "trigger",
-        {
-          "name": "overseer_mongodb",
-          "type": "db",
-          "extends": "docker-db",
-          "retry": 2,
-          "context": {
-            "engine_name": "mongodb"
-          }
-        }
+        "mongodb"
       ]
     }
   ]

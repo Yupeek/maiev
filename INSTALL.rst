@@ -17,31 +17,12 @@ the minimal setup must be reached to make it possible to deploy other part. this
 
 - a docker swarm running and a overlay network
 
-.. code:: bash
-
-	docker swarm init  --advertise-addr  $MYADDR
-	docker network create --driver overlay --subnet 10.0.9.0/24 maiev
-
-
 - a running rabbitmq instance
-
-.. code:: bash
-
-	docker service create --name rabbitmq --replicas 1 --network=maiev rabbitmq
-
 
 - a running main monitoring instance (Overseer)
 
-.. code:: bash
-
-	docker service create --name overseer --replicas 1 --network=maeiv overseer
-
-
 - a running docker scaler to interact with docker swarm
 
-.. code:: bash
-
-	docker service create --name scaler_docker --replicas 1 --network=maeiv --env DOCKER_HOST=docker_swarm_node:2375  scaler_docker
 
 .. note::
 
@@ -61,8 +42,8 @@ the minimal setup must be reached to make it possible to deploy other part. this
 	if this repository is not secure, you must start docker with ``--insecure-registry docker_swarm_node:5000`` on all
 	docker that will push to it (and then trigger the upgrade in the swarm)
 
-5 minutes setup
-***************
+15 minutes setup
+****************
 
 to test this arch, there is a fast way to setup Maiev via the embed makefile.
 
@@ -75,7 +56,7 @@ to test this arch, there is a fast way to setup Maiev via the embed makefile.
 
 		[Service]
 		ExecStart=
-		ExecStart=/usr/bin/dockerd -H fd:// --experimental -H tcp://0.0.0.0:2375 --insecure-registry localdocker:5000
+		ExecStart=/usr/bin/dockerd -H fd:// -H tcp://0.0.0.0:2375 --insecure-registry localdocker:5000
 
 	don't forget to ``sudo systemctl daemon-reload`` and ``sudo systemctl restart docker`` after adding this file.
 
@@ -85,23 +66,85 @@ to test this arch, there is a fast way to setup Maiev via the embed makefile.
 
 		echo "$(ip a s | awk '/inet /{print $2}' | grep -v 127.0.0.1 | head -n 1 |  cut -d/ -f 1) localdocker" >> /etc/hosts
 
-create a local repository in which we will temporary store the buildt maiev images
+
+create all service for required parts
+
+swarm creation + overlay network
+================================
+
+each services need a overlay network to comunicate
 
 .. code:: bash
 
-	docker run -d --rm --name registry -p 5001:5000 registry:2
+	export MYADDR="$(ip a s | awk '/inet /{print $2}' | grep -v 127.0.0.1 | head -n 1 |  cut -d/ -f 1)"
+	export MONGO_URIS="IP_OR_NAME"
 
-build all images and deploy them in the new buildt repository
+	docker swarm init  --advertise-addr  $MYADDR
+	docker network create --driver overlay --subnet 10.0.9.0/24 maiev
+
+rabbitmq service
+================
+
+the message queue used by maiev is rabbitmq
 
 .. code:: bash
 
-	DOCKER_REPO=localhost:5001 make install
+	docker service create --name rabbitmq --replicas 1 --network=maiev rabbitmq:3-management
 
-now all the stack is ok, we can remove the registry
+scaler_docker
+=============
+
+the service which manage docker. it must be able to acced a manager node by TCP.
+
+tls enabled authentication is a realy good idea. the certificate for authentication should be added as
+a swarm secret
+
+with TLS
+--------
+
+this setup is the most secure. it forbide manipulation of your manager via other service than scaler_docker
 
 .. code:: bash
 
-	docker stop registry
+	cat cert.pem key.pem ca.pem | docker secret create docker_manager_tls.pem -
+	docker service create --name scaler_docker --network maeiv --secret docker_manager_tls.pem -e DOCKER_HOST=tcp://docker_swarm_node:2375 -e DOCKER_TLS_VERIFY=1 -e DOCKER_CERT_PATH=/app docker.io/yupeek/maiev:scaler_docker-latest
+
+without TLS
+-----------
+
+without tls, INSECURE
+
+.. code:: bash
+
+	docker service create --name scaler_docker --network maeiv -e DOCKER_HOST=tcp://docker_swarm_node:2375  docker.io/yupeek/maiev:scaler_docker-latest
+
+monitorer rabbitmq
+==================
+
+the service that fetch rabbitmq metrics to detect load
+
+.. code:: bash
+
+	docker service create --name monitorer_rabbitmq --network maiev yupeek/maiev:monitorer_rabbitmq-latest
+
+trigger
+=======
+
+thes service that compute each metrics from MQ and send the boolean result to overseer
+
+.. code:: bash
+
+	docker service create --name trigger -e MONGO_URIS=${MONGO_URIS} --network maiev yupeek/maiev:trigger-latest
+
+Overseer
+========
+
+the real orchestrator service
+
+.. code:: bash
+
+	docker service create --name overseer --replicas 1 --network=maeiv overseer
+
 
 Docker full integration
 ***********************

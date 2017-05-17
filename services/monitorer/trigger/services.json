@@ -3,21 +3,10 @@
     {
       "name": "{dirname}",
       "extends": "docker",
-      "context": {
-        "extra_link": "--link={dirname}_mongodb"
-      },
       "require": [
         "super()",
         "monitorer_rabbitmq",
-        {
-          "name": "{dirname}_mongodb",
-          "type": "db",
-          "extends": "docker-db",
-          "retry": 2,
-          "context": {
-            "engine_name": "mongodb"
-          }
-        }
+        "mongodb"
       ]
     }
   ]

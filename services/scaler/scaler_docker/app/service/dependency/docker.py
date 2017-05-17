@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 class DockerClientProvider(DependencyProvider):
 
     def setup(self):
-        docker_cfg = self.container.config.get('DOCKER', {})
+        docker_cfg = self.container.config.get('DOCKER')
         if docker_cfg:
             self.client = client.DockerClient(**docker_cfg)
         else:

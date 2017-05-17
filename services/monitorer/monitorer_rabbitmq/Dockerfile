@@ -13,5 +13,5 @@ RUN apk del gcc linux-headers
 
 
 USER service
-CMD ["nameko", "run", "--config", "config.yaml", "monitorer_rabbitmq"]
+CMD ["nameko", "run", "--config", "config.yaml", "service.monitorer_rabbitmq.monitorer_rabbitmq"]
 
