@@ -2,6 +2,7 @@
 
 import datetime
 import logging
+import re
 import types
 from functools import partial, wraps
 
@@ -113,3 +114,136 @@ def merge_dict(into, *args):
                 into[k] = v
                 updated = True
     return updated
+
+
+class ImageVersion(object):
+    """
+    an object which represent an image version/tag/repository.
+    it parse data from docker and can be used for equiality and inequality compartion.
+
+    it use the folowing info from hints to know the image info :
+
+    image-identifier : repo, image-name, [tag], metadata['image']
+    version identifier: tag, metadata['version']
+
+    this support for sub-image consideration in the tag (repo/globalservice:subservice-version)
+
+    """
+    tag_regex = re.compile('^((?P<version>[0-9.]+|latest)|-|(?P<species>[a-zA-Z_]+))+$')
+    """
+    the rexexp to parse the tage: see https://regex101.com/r/o2hr5V/3
+    """
+
+    def __init__(self, data):
+        """
+        create an image Version using the given hints.
+        hints should be a docker image datas (repo, image-name, tags)
+        :param dict hints: the firts from which we parse the current version. must contains:
+
+            - repository: the repository_name
+            - image: the image name
+            - tag: the tag of the image
+            - digest: the digest of the image
+            - [facultative] metada: a set of metadata (including 'image' and 'version')
+
+        """
+        self.data = data
+
+    @classmethod
+    def from_scaler(cls, hints):
+        return cls(cls.parse(hints))
+
+    @classmethod
+    def parse(cls, hints):
+        """
+        parse the hints into a tuple of parsed_raw data
+        :param dict hints: the hint as taken from the hints
+        :rtype: dict
+        :return: the dict with the finaly parsed_raw data
+
+        - repository: the repository
+        - image: the name of the image in the repository
+        - species: the name of the species of this image
+        - tag: the full tag, unpersed for version and species
+        - version: the version, parsed_raw from tag or metadata if possible
+        - digest: the digest of the image
+        """
+        image = hints['image']
+        tag = hints.get('tag')
+        result = {
+            'repository': hints.get('repository'),
+            'image': image,
+            'tag': tag,
+            'species': None,
+            'version': None,
+            'digest': hints.get('digest')
+        }
+        parsed_raw = cls.tag_regex.match(tag)
+        if parsed_raw:
+            result.update(parsed_raw.groupdict())
+        return result
+
+    def is_same_image(self, other):
+        """
+        check if the two Version match the same image
+        :param other:
+        :return:
+        """
+        d, o = self.data, other.data
+        return d['repository'] == o['repository'] and d['image'] == o['image'] \
+            and d['species'] == o['species']
+
+    def __eq__(self, other):
+        if not self.is_same_image(other):
+            return False
+        if self.data['version'] == 'latest':
+            return other.data['version'] == 'latest' and self.data['digest'] == other.data['digest']
+        else:
+            return self.data['version'] == other.data['version']
+
+    def __hash__(self):
+        d = self.data
+        return hash((d[attr] for attr in ['repository', 'image', 'species', 'version']))
+
+    def __lt__(self, other):
+        sv = self.data['version']
+        ov = other.data['version']
+        return self.is_same_image(other) and sv is not None and ov is not None and sv != 'latest' and sv < ov
+
+    def __gt__(self, other):
+        sv = self.data['version']
+        ov = other.data['version']
+        return self.is_same_image(other) and sv is not None and ov is not None and (sv > ov or sv == 'latest')
+
+    @property
+    def image_id(self):
+        """
+        return a string which represent the image identifier.
+        it is used for database query
+        :return:
+        """
+        return "{repository}/{image}:{species}".format(**self.data)
+
+    @property
+    def unique_image_id(self):
+        """
+        return the unique id of this image, including tags and digest
+        :return:
+        """
+        res = "{repository}/{image}:{tag}".format(**self.data)
+        if self.data['digest']:
+            res += "@%s" % self.data['digest']
+        return res
+
+    def __repr__(self):
+        return "<ImageVersion {image_id} version={version}>".format(image_id=self.image_id, **self.data)
+
+    def __str__(self):
+        return "ImageVersion {image_id} version={version}".format(image_id=self.image_id, **self.data)
+
+    def serialize(self):
+        return self.data
+
+    @classmethod
+    def deserialize(cls, data):
+        return cls(data)

@@ -22,7 +22,6 @@ clean:
 build-image:  ## build this image docker
 	docker build \
 		-t $(SERVICE_NAME) \
-		--no-trunc \
 		.
 # === DEPLOY DOCKER IMAGE
 

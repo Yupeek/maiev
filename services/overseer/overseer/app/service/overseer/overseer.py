@@ -5,7 +5,7 @@ from functools import partial
 
 from common.db.mongo import Mongo
 from common.entrypoint import once
-from common.utils import filter_dict, log_all, make_promise, merge_dict
+from common.utils import filter_dict, log_all, make_promise, merge_dict, ImageVersion
 from nameko.events import SERVICE_POOL, EventDispatcher, event_handler
 from nameko.rpc import RpcProxy, rpc
 from promise.promise import Promise
@@ -125,41 +125,33 @@ class Overseer(object):
         logger.debug("received image update notification %s", payload)
         scaler_type = self.reversed_type_to_scaler[payload['from']]
         assert scaler_type == 'docker'
+        assert set(payload) >= {'repository', 'image', 'tag', 'digest'}
 
-        for service in self._get_services(scaler_type=scaler_type, image_name=payload['image_name']):
+        new_image_version = ImageVersion.from_scaler(payload)
+        logger.debug("version found for this push : %s", new_image_version)
+
+        for service in self._get_services(scaler_type=scaler_type, full_image_id=new_image_version.image_id):
             logger.debug("check for updating %s", service['name'])
-            logger.debug("current image: %s new one : %s",
-                         service.get('image', {}).get("full_image_id"),
-                         payload['full_image_id']
-                         )
-            if service.get('image', {}).get("full_image_id") == payload['full_image_id']:
+            current_image_version = ImageVersion.deserialize(service['image']['image_info'])
+            logger.debug("current image: %s new one : %s", current_image_version, new_image_version)
+            if current_image_version == new_image_version:
                 logger.debug("service %s already with the notified image", service['name'])
                 continue
 
+            # manage the new scale config
             new_scale_config = payload['scale_config']
-            scale_config = service.get('scale_config') or {}
 
-            if new_scale_config:
-                merged = merge_dict(scale_config, new_scale_config)
-                if merged:
-                    service['scale_config'] = scale_config
-                    logger.debug("update scale config from %s to %s", scale_config, new_scale_config)
-                    # the scale config has been updated
-                    mongo_result = self.mongo.services.update_one(
-                        {'_id': service['_id']},
-                        {'$set': {"scale_config": scale_config}}
-                    )
-                    logger.debug("update result : %s", mongo_result)
-
-            if scale_config.get('auto_update', True):
+            if new_scale_config.get('auto_update', True) and new_image_version > current_image_version:
                 current, new_scale_size = self._get_best_scale(service)
                 extra_args = dict(
-                    image_id=payload['full_image_id']
+                    image_id=new_image_version.unique_image_id
                 )
                 if new_scale_size is not None and current != new_scale_size:
                     extra_args['scale'] = new_scale_size
                 logger.debug("updating %s with %s", service['name'], extra_args)
-                self._update_service(service, **extra_args)
+                self._update_service(service, **extra_args).then(
+                    partial(self.__update_scale_config, service=service)
+                )
 
     # ####################################################
     #                 ONCE
@@ -205,14 +197,13 @@ class Overseer(object):
         scaler = self._get_scaler(scaler_name)
         service_data = scaler.get(service_name=service_name)
         config = scaler.fetch_image_config(service_data['full_image_id'])
+        image_version = ImageVersion.from_scaler(service_data)
         result = {
             "name": service_name,
             "image": {
                 "type": scaler.type,
-                "name": service_data['image'],
-                "repository": service_data['repository'],
-                "version": service_data['version'],
-                'full_image_id': service_data['full_image_id'],
+                "image_info": image_version.serialize(),
+                'full_image_id': image_version.image_id,
             },
             "scale_config": config,
             "start_conig": {
@@ -247,7 +238,7 @@ class Overseer(object):
     @rpc
     @log_all
     def test(self):
-        s = self._get_services('docker', image_name='nginx')
+        s = self._get_services('docker', full_image_id='nginx')
         return [filter_dict(d) for d in s]
 
     @rpc
@@ -298,11 +289,11 @@ class Overseer(object):
     def _get_service(self, service_name):
         return self.mongo.services.find_one({'name': service_name})
 
-    def _get_services(self, scaler_type, image_name=None):
+    def _get_services(self, scaler_type, full_image_id=None):
         q = {
             "$and": [
                 {'image.type': scaler_type},
-                {'image.name': image_name},
+                {'image.full_image_id': full_image_id},
             ]
         }
         return self.mongo.services.find(q)
@@ -359,12 +350,12 @@ class Overseer(object):
         """
         # update replicas current status
         service['mode'] = service_data['mode']
+        imageversion = ImageVersion.from_scaler(service_data)
+        logger.debug("image version %s", imageversion.data)
         service['image'] = {
             "type": scaler.type,
-            "name": service_data['image'],
-            "repository": service_data['repository'],
-            "version": service_data['version'],
-            'full_image_id': service_data['full_image_id'],
+            "image_info": imageversion.serialize(),
+            'full_image_id': imageversion.image_id
         }
         self.mongo.services.update_one(
             {'_id': service['_id']},
@@ -404,7 +395,7 @@ class Overseer(object):
         """
 
         rules = []
-        scale_config_ = service['scale_config']
+        scale_config_ = service.get('scale_config') or {}
         trigger_config = scale_config_.get('scale', {})
         for rule in trigger_config.get('rules', ()):
             if rule['name'] in ("__scale_up__", "__scale_down__"):

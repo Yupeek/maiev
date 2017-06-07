@@ -64,10 +64,11 @@ class ScalerDockerTestCase(unittest.TestCase):
             {
                 'from': 'scaler_docker',
                 'scale_config': {},
-                'version': 'test',
+                'tag': 'test',
                 'full_image_id': 'localdocker:5000/nginx@sha256:11756e3866c185aa3cc5fa77b912456da8'
                                  '47d276e3d55c50eabc6421612a2a1f',
                 'image_name': 'nginx',
+                'repository': 'localdocker',
                 'digest': 'sha256:11756e3866c185aa3cc5fa77b912456da847d276e3d55c50eabc6421612a2a1f'
             }
         )

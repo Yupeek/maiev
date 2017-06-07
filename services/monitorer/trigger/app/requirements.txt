@@ -1,1 +1,1 @@
-file:///app/booleano-1.1a1.tar.gz
+booleano==1.1a1

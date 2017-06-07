@@ -80,8 +80,8 @@ def recompose_full_id(decomposed):
     res = decomposed['name']
     if decomposed.get('repository'):
         res = "%s/%s" % (decomposed['repository'].strip('/'), res)
-    if decomposed.get('version'):
-        res = '%s:%s' % (res, decomposed['version'])
+    if decomposed.get('tag'):
+        res = '%s:%s' % (res, decomposed['tag'])
     if decomposed.get('digest'):
         res = "%s@%s" % (res, decomposed['digest'])
     return res
@@ -143,13 +143,14 @@ class ScalerDocker(object):
                         event_payload = {
                             'from': self.name,
                             'digest': target['digest'],
-                            'image_name': target['repository'],
+                            'image': target['repository'],
+                            'repository': event['request']['host'],
                             'full_image_id': '%s/%s@%s' % (event['request']['host'],
                                                            target['repository'],
                                                            target['digest'])
                         }
                         if 'tag' in target:
-                            event_payload['version'] = target['tag']
+                            event_payload['tag'] = target['tag']
                         try:
                             event_payload['scale_config'] = self.fetch_image_config(event_payload['full_image_id'])
                         except docker.errors.DockerException:
@@ -243,7 +244,7 @@ class ScalerDocker(object):
 
         - name: name of the service
         - image: the name of the image
-        - version: the versio of the image
+        - tag: the versio of the image
         - repository
         - ports: the list of the port accessible by this service {'published', 'target'}
         - intances: the list of tasks (runnings or downs)
@@ -273,8 +274,9 @@ class ScalerDocker(object):
             'name': service.name,
             'full_image_id': image_full_id,
             'image': image_data['image'],
-            'version': image_data['tag'],
+            'tag': image_data['tag'],
             'repository': image_data['repository'],
+            'digest': image_data['digest'],
             'ports': [
                 {'published': d['PublishedPort'],
                  'target': d['TargetPort']
@@ -292,7 +294,7 @@ class ScalerDocker(object):
         return {
             'is_running': task['Status']['State'] == 'running',
             'image': image_data['image'],
-            'version': image_data['tag'],
+            'tag': image_data['tag'],
             'repository': image_data['repository'],
             'updated_at': task['UpdatedAt']
         }

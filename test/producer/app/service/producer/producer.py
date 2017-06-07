@@ -61,5 +61,5 @@ class Producer(object):
         :param service: 
         :return: 
         """
-        eventlet.patcher.original('time').sleep(0.008)
+        eventlet.patcher.original('time').sleep(0.009)
         return 42
