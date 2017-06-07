@@ -135,30 +135,10 @@ class ScalerDocker(object):
         def propagate_events():
             try:
                 data = json.loads(request.get_data(as_text=True))
-                for event in data['events']:
-                    target = event['target']
-                    logger.debug('event from repo: %s', target)
-
-                    if event['action'] == 'push':
-                        event_payload = {
-                            'from': self.name,
-                            'digest': target['digest'],
-                            'image': target['repository'],
-                            'repository': event['request']['host'],
-                            'full_image_id': '%s/%s@%s' % (event['request']['host'],
-                                                           target['repository'],
-                                                           target['digest'])
-                        }
-                        if 'tag' in target:
-                            event_payload['tag'] = target['tag']
-                        try:
-                            event_payload['scale_config'] = self.fetch_image_config(event_payload['full_image_id'])
-                        except docker.errors.DockerException:
-                            logger.exception("error while fetching image config for %s" %
-                                             event_payload['full_image_id'])
-
-                        self.dispatch('image_updated', event_payload)
-                        logger.debug("dispatching %s", event_payload)
+                if 'events' in data:
+                    self._parse_event_from_registry(data)
+                else:
+                    self._parse_event_from_hub(data)
             except Exception:
                 logger.exception("error while receiving docker push notification")
         self.pool.spawn(propagate_events)
@@ -237,6 +217,63 @@ class ScalerDocker(object):
     # ####################################################
     #                 PRIVATE
     # ####################################################
+
+    def _parse_event_from_registry(self, data):
+        """
+        parse the event from a docker registry instance and dispatch an «image_updated» for this image
+        :param data:
+        :return:
+        """
+        events = data.get('events')
+        for event in events:
+            target = event['target']
+            logger.debug('event from repo: %s', target)
+
+            if event['action'] == 'push':
+                event_payload = {
+                    'from': self.name,
+                    'digest': target['digest'],
+                    'image': target['repository'],
+                    'repository': event['request']['host'],
+                    'full_image_id': '%s/%s@%s' % (event['request']['host'],
+                                                   target['repository'],
+                                                   target['digest'])
+                }
+                if 'tag' in target:
+                    event_payload['tag'] = target['tag']
+                try:
+                    event_payload['scale_config'] = self.fetch_image_config(event_payload['full_image_id'])
+                except docker.errors.DockerException:
+                    logger.exception("error while fetching image config for %s" %
+                                     event_payload['full_image_id'])
+
+                self.dispatch('image_updated', event_payload)
+                logger.debug("dispatching %s", event_payload)
+
+    def _parse_event_from_hub(self, data):
+        """
+        parse the event from docker hub. and dispatch an «image_updated» for this image
+        :param data:
+        :return:
+        """
+        push_data = data['push_data']
+        event_payload = {
+            'from': self.name,
+            'digest': None,
+            'image': data['repository']['name'],
+            'repository': data['repository']['namespace'],
+            'full_image_id': '%s/%s:%s' % (data['repository']['namespace'], data['repository']['name'],
+                                                        push_data['tag']), 'tag': push_data['tag']
+        }
+
+        try:
+            event_payload['scale_config'] = self.fetch_image_config(event_payload['full_image_id'])
+        except docker.errors.DockerException:
+            logger.exception("error while fetching image config for %s" %
+                             event_payload['full_image_id'])
+
+        self.dispatch('image_updated', event_payload)
+        logger.debug("dispatching %s", event_payload)
 
     def _build_service_stat(self, service):
         """

@@ -1,4 +1,3 @@
-
 import json
 import logging
 import unittest
@@ -13,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 class ScalerDockerTestCase(unittest.TestCase):
-
     EVENT_FIXTURE = {
         "events": [
             {
@@ -48,6 +46,19 @@ class ScalerDockerTestCase(unittest.TestCase):
         ]
     }
 
+    DOCKERHUB_EVENT_FIXTURE = {
+        "push_data": {"pushed_at": 1496845658, "images": [], "tag": "scaler_docker-1.0.2", "pusher": "yupeek"},
+        "callback_url": "https://registry.hub.docker.com/u/yupeek/maiev/hook/25h2cb4chfgfb4f45eaf1cf0354ddafj2/",
+        "repository": {"status": "Active", "description": "all docker image for the maiev micro-service ochestrator",
+                       "is_trusted": False,
+                       "full_description": "Maiev is a ochestrator for micro-service.\n\nit's a set of micro-service "
+                                           "that monitor, scale and upgrade automaticaly based on information given "
+                                           "by the micro-service itself.\n\nsee the gitub page : "
+                                           "https://github.com/Yupeek/maiev",
+                       "repo_url": "https://hub.docker.com/r/yupeek/maiev", "owner": "yupeek", "is_official": False,
+                       "is_private": False, "name": "maiev", "namespace": "yupeek", "star_count": 0,
+                       "comment_count": 0, "date_created": 1494921366, "repo_name": "yupeek/maiev"}}
+
     def test_push_notification(self):
         pool = eventlet.greenpool.GreenPool(1)
         fake_provider = mock.MagicMock(DockerClient)
@@ -67,9 +78,33 @@ class ScalerDockerTestCase(unittest.TestCase):
                 'tag': 'test',
                 'full_image_id': 'localdocker:5000/nginx@sha256:11756e3866c185aa3cc5fa77b912456da8'
                                  '47d276e3d55c50eabc6421612a2a1f',
-                'image_name': 'nginx',
-                'repository': 'localdocker',
+                'image': 'nginx',
+                'repository': 'localdocker:5000',
                 'digest': 'sha256:11756e3866c185aa3cc5fa77b912456da847d276e3d55c50eabc6421612a2a1f'
+            }
+        )
+
+    def test_push_notification_from_hub(self):
+        pool = eventlet.greenpool.GreenPool(1)
+        fake_provider = mock.MagicMock(DockerClient)
+        fake_provider.containers.run.return_value = b'{}'
+
+        service = worker_factory(ScalerDocker, pool=pool, docker=fake_provider)  # type: ScalerDocker
+        request = mock.Mock()
+        request.get_data = lambda as_text: json.dumps(self.DOCKERHUB_EVENT_FIXTURE)
+
+        service.event(request)
+        pool.waitall()
+        service.dispatch.assert_called_once_with(
+            'image_updated',
+            {
+                'from': 'scaler_docker',
+                'scale_config': {},
+                'tag': 'scaler_docker-1.0.2',
+                'full_image_id': 'yupeek/maiev:scaler_docker-1.0.2',
+                'image': 'maiev',
+                'repository': 'yupeek',
+                'digest': None
             }
         )
 
