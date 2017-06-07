@@ -7,6 +7,7 @@ from common.db.mongo import Mongo
 from common.entrypoint import once
 from common.utils import filter_dict, log_all, make_promise, merge_dict, ImageVersion
 from nameko.events import SERVICE_POOL, EventDispatcher, event_handler
+from nameko.exceptions import UnknownService
 from nameko.rpc import RpcProxy, rpc
 from promise.promise import Promise
 
@@ -380,12 +381,14 @@ class Overseer(object):
         logger.debug("inserted service %s: \n%s", result['name'], result)
         # now, we add the trigger config to scale automaticaly this service upon events.
         ruleset = self._create_trigger_ruleset(result)
-
-        test = self.trigger.compute(ruleset)
-        if test['status'] == 'success':
-            self.trigger.add(ruleset)
-        else:
-            logger.error("imposible to add the ruleset %s: %s", ruleset, test)
+        try:
+            test = self.trigger.compute(ruleset)
+            if test['status'] == 'success':
+                self.trigger.add(ruleset)
+            else:
+                logger.error("imposible to add the ruleset %s: %s", ruleset, test)
+        except UnknownService:
+            logger.error("trigger service is not available. can't set the rules")
 
     def _create_trigger_ruleset(self, service):
         """
