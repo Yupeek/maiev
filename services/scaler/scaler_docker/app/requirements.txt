@@ -1,2 +1,2 @@
-https://github.com/Yupeek/docker-py/archive/master.zip
+https://github.com/Yupeek/docker-py/archive/master.zip#874c29c
 requests

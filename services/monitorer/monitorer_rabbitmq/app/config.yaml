@@ -1,6 +1,6 @@
 AMQP_URI: amqp://${RABBITMQ_USER:guest}:${RABBITMQ_PASSWORD:guest}@${RABBITMQ_HOST:localhost}
 WEB_SERVER_ADDRESS: '0.0.0.0:8000'
-MONITORED_SERVER_URL: http://guest:guest@192.168.253.139:15672/api/
+MONITORED_SERVER_URL: http://${RABBITMQ_USER:guest}:${RABBITMQ_PASSWORD:guest}@${RABBITMQ_HOST:localhost}:15672/api/
 
 serializer: json_datecompatible
 

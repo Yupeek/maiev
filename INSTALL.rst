@@ -19,6 +19,8 @@ the minimal setup must be reached to make it possible to deploy other part. this
 
 - a running rabbitmq instance
 
+- a running mondogb instance
+
 - a running main monitoring instance (Overseer)
 
 - a running docker scaler to interact with docker swarm
@@ -78,9 +80,18 @@ each services need a overlay network to comunicate
 
 	export MYADDR="$(ip a s | awk '/inet /{print $2}' | grep -v 127.0.0.1 | head -n 1 |  cut -d/ -f 1)"
 	export MONGO_URIS="IP_OR_NAME"
+	export NETWORK_NAME=maiev
+	export MAIEV_VERSION=latest
 
 	docker swarm init  --advertise-addr  $MYADDR
-	docker network create --driver overlay --subnet 10.0.9.0/24 maiev
+	docker network create --driver overlay --subnet 10.0.9.0/24 ${NETWORK_NAME}
+
+mongodb setup
+=============
+
+all services which require a mongodb to work will connect to the database given by the env MONGO_URIS.
+you will pass this env during the `docker service create` call via the `-e MONGO_URIS="${MONGO_URIS}"` flag.
+
 
 rabbitmq service
 ================
@@ -89,7 +100,7 @@ the message queue used by maiev is rabbitmq
 
 .. code:: bash
 
-	docker service create --name rabbitmq --replicas 1 --network=maiev rabbitmq:3-management
+	docker service create --name rabbitmq --replicas 1 --network=${NETWORK_NAME} rabbitmq:3-management
 
 scaler_docker
 =============
@@ -102,12 +113,29 @@ a swarm secret
 with TLS
 --------
 
-this setup is the most secure. it forbide manipulation of your manager via other service than scaler_docker
+this setup is the most secure. it forbide manipulation of your manager via other service than scaler_docker.
+to achieve this, we use a client/server tls certificate verification. if your docker daemon is started with the configuration
+using tls, the setup is a folow:
+
+- you have an CA
+- you have isued a certificate for your scaler docker using this CA
+- you have isued a certificate for your daemon using the same CA
+- you have started your daemon with `--tlsverify --tlscacert=/etc/ssl/certs/CA.pem --tlscert=/etc/ssl/certs/dockerdaemon.pem --tlskey=/etc/ssl/private/dockerdaemon.key`
+
+the next setup use the certificate and the key isued for your scaler docker. it need the CA certificate too.
+
+we use this cert.pem (certificate), key.pem (private key) and ca.pem (the CA cert) to create a docker secert shared with
+the running scaler docker. this docker will use it to authenticate with the docker daemon.
+
+.. note::
+
+	the name of the secret must be «docker_manager_tls.pem». this is hardcoded into the scaler_docker image
+
 
 .. code:: bash
 
 	cat cert.pem key.pem ca.pem | docker secret create docker_manager_tls.pem -
-	docker service create --name scaler_docker --network maeiv --secret docker_manager_tls.pem -e DOCKER_HOST=tcp://docker_swarm_node:2375 -e DOCKER_TLS_VERIFY=1 -e DOCKER_CERT_PATH=/app docker.io/yupeek/maiev:scaler_docker-latest
+	docker service create --name scaler_docker --network maeiv --secret docker_manager_tls.pem -e DOCKER_HOST=tcp://docker_swarm_node:2375 -e DOCKER_TLS_VERIFY=1 -e DOCKER_CERT_PATH=/app docker.io/yupeek/maiev:scaler_docker-${MAIEV_VERSION}
 
 without TLS
 -----------
@@ -116,7 +144,7 @@ without tls, INSECURE
 
 .. code:: bash
 
-	docker service create --name scaler_docker --network maeiv -e DOCKER_HOST=tcp://docker_swarm_node:2375  docker.io/yupeek/maiev:scaler_docker-latest
+	docker service create --name scaler_docker --network maeiv -e DOCKER_HOST=tcp://docker_swarm_node:2375  docker.io/yupeek/maiev:scaler_docker-${MAIEV_VERSION}
 
 monitorer rabbitmq
 ==================
@@ -125,7 +153,7 @@ the service that fetch rabbitmq metrics to detect load
 
 .. code:: bash
 
-	docker service create --name monitorer_rabbitmq --network maiev yupeek/maiev:monitorer_rabbitmq-latest
+	docker service create --name monitorer_rabbitmq --network=${NETWORK_NAME} -e MONGO_URIS="${MONGO_URIS}" yupeek/maiev:monitorer_rabbitmq-${MAIEV_VERSION}
 
 trigger
 =======
@@ -134,7 +162,7 @@ thes service that compute each metrics from MQ and send the boolean result to ov
 
 .. code:: bash
 
-	docker service create --name trigger -e MONGO_URIS=${MONGO_URIS} --network maiev yupeek/maiev:trigger-latest
+	docker service create --name trigger -e MONGO_URIS="${MONGO_URIS}" --network=${NETWORK_NAME} yupeek/maiev:trigger-${MAIEV_VERSION}
 
 Overseer
 ========
@@ -143,7 +171,7 @@ the real orchestrator service
 
 .. code:: bash
 
-	docker service create --name overseer --replicas 1 --network=maeiv overseer
+	docker service create --name overseer -e MONGO_URIS="${MONGO_URIS}" --network ${NETWORK_NAME} yupeek/maiev:overseer-${MAIEV_VERSION}
 
 
 Docker full integration
@@ -159,7 +187,7 @@ remote registry
 
 .. code:: bash
 
-	docker service update --publish-add xxxx:8000 scaler-docker
+	docker service update --publish-add xxxx:8000 scaler_docker
 
 2. configure your repository to add this url into notifications.
    with scaler-docker a valid dns name resolving to your cluster.
