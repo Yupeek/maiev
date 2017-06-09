@@ -8,9 +8,10 @@ from functools import partial, wraps
 
 import eventlet
 from promise.promise import Promise
+from semantic_version import Version
 
 
-def log_all(meth_or_ignore_excpt=None, ignore_exceptions=(SystemExit, )):
+def log_all(meth_or_ignore_excpt=None, ignore_exceptions=(SystemExit,)):
     if isinstance(meth_or_ignore_excpt, types.FunctionType):
 
         meth = meth_or_ignore_excpt
@@ -41,7 +42,9 @@ def make_promise(result_async):
     def promise_caller(resolve, reject):
         def promise_waiter():
             resolve(result_async.result())  # will wait for rcp reply
+
         eventlet.spawn(promise_waiter)
+
     return Promise(promise_caller)
 
 
@@ -191,7 +194,7 @@ class ImageVersion(object):
         """
         d, o = self.data, other.data
         return d['repository'] == o['repository'] and d['image'] == o['image'] \
-            and d['species'] == o['species']
+               and d['species'] == o['species']
 
     def __eq__(self, other):
         if not self.is_same_image(other):
@@ -199,7 +202,7 @@ class ImageVersion(object):
         if self.data['version'] == 'latest':
             return other.data['version'] == 'latest' and self.data['digest'] == other.data['digest']
         else:
-            return self.data['version'] == other.data['version']
+            return self.version == other.version
 
     def __hash__(self):
         d = self.data
@@ -208,12 +211,33 @@ class ImageVersion(object):
     def __lt__(self, other):
         sv = self.data['version']
         ov = other.data['version']
-        return self.is_same_image(other) and sv is not None and ov is not None and sv != 'latest' and sv < ov
+        return self.is_same_image(other) and \
+            sv is not None and \
+            ov is not None and \
+            sv != 'latest' and \
+            (
+                ov == 'latest' or
+                self.version < other.version
+            )
 
     def __gt__(self, other):
         sv = self.data['version']
         ov = other.data['version']
-        return self.is_same_image(other) and sv is not None and ov is not None and (sv > ov or sv == 'latest')
+        return self.is_same_image(other) and \
+               sv is not None and \
+               ov is not None and \
+               (
+                   sv == 'latest' or
+                   self.version > other.version
+
+               )
+
+    @property
+    def version(self):
+        if self.data['version'] in (None, 'latest'):
+            return self.data['version']
+        else:
+            return Version.coerce(self.data['version'])
 
     @property
     def image_id(self):

@@ -48,7 +48,7 @@
         {
           "name": "nameko cmdline",
           "exec": ["/bin/bash", "-c",
-            "sleep 1 && echo \"nameko shell --broker amqp://guest:guest@$(docker inspect rabbitmq | jq -r '.[].NetworkSettings.Networks.\"{networkname}\".IPAddress')\""
+            "sleep 1 && echo \"RABBITMQ_HOST=$(docker inspect rabbitmq | jq -r '.[].NetworkSettings.Networks.\"{networkname}\".IPAddress') nameko shell --config {root}/services/maiev-base/app/config.yaml\""
           ],
           "type": "string"
         }

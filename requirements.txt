@@ -5,3 +5,4 @@ https://github.com/eventlet/eventlet/archive/f266be30f5c3ff1889e9ac3f0bad698a49d
 watchdog
 promise==2.0b1
 pymongo
+semantic_version
