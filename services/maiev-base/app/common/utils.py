@@ -132,7 +132,8 @@ class ImageVersion(object):
     this support for sub-image consideration in the tag (repo/globalservice:subservice-version)
 
     """
-    tag_regex = re.compile('^((?P<version>[0-9.]+|latest)|-|(?P<species>[a-zA-Z_]+))+$')
+    _VERSION_REGEXP = '(\d+)(?:\.(\d+)(?:\.(\d+))?)?(?:([0-9a-zA-Z.]*))?(?:\+([0-9a-zA-Z.]*))?'
+    tag_regex = re.compile('^((?P<version>%s|latest)|-|(?P<species>[a-zA-Z_]+))+$' % _VERSION_REGEXP)
     """
     the rexexp to parse the tage: see https://regex101.com/r/o2hr5V/3
     """

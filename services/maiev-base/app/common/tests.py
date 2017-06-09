@@ -67,6 +67,10 @@ class TestImageVersion(TestCase):
         self.assert_parsed_equal('overseer-latest', version="latest", species='overseer')
         self.assert_parsed_equal('scaler_docker-1.0', version="1.0", species='scaler_docker')
         self.assert_parsed_equal('scaler_docker', version=None, species='scaler_docker')
+        # private advanced
+        self.assert_parsed_equal('overseer-1.0.69a1+build45', version="1.0.69a1+build45", species='overseer')
+        self.assert_parsed_equal('overseer-1.0.69a1', version="1.0.69a1", species='overseer')
+        self.assert_parsed_equal('overseer-1.0.69+build43', version="1.0.69+build43", species='overseer')
 
     def test_full_parse(self):
         self.assert_parsed_equal('alpine', 'python', 'localhost', version=None, image='python',
@@ -160,6 +164,19 @@ class TestImageVersion(TestCase):
         self.assertTrue(
             self.create_iv('overseer-3.1.76') > self.create_iv('overseer-3.1.9')
         )
+        self.assertTrue(
+            self.create_iv('overseer-3.1.9a1') < self.create_iv('overseer-3.1.76')
+        )
+        self.assertTrue(
+            self.create_iv('overseer-3.1.76') > self.create_iv('overseer-3.1.9a1')
+        )
+        self.assertFalse(
+            self.create_iv('overseer-3.1.9+build1') < self.create_iv('overseer-3.1.9')
+        )
+        self.assertFalse(
+            self.create_iv('overseer-3.1.9+build1') > self.create_iv('overseer-3.1.9')
+        )
+
 
     def test_latest_equality(self):
         # the default behavior is to treat latest tages as special version
