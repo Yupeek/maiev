@@ -140,7 +140,7 @@ class Overseer(object):
                 continue
 
             # manage the new scale config
-            new_scale_config = payload['scale_config']
+            new_scale_config = payload['scale_config'] or {}
 
             if new_scale_config.get('auto_update', True) and new_image_version > current_image_version:
                 current, new_scale_size = self._get_best_scale(service)
@@ -238,6 +238,17 @@ class Overseer(object):
 
     @rpc
     @log_all
+    def unmonitor_service(self, service_name):
+        """
+        return all current state for the given service.
+        :param service_name: the service's name
+        :return: all internal data from db
+        """
+
+        return self._remove_service(service_name)
+
+    @rpc
+    @log_all
     def test(self):
         s = self._get_services('docker', full_image_id='nginx')
         return [filter_dict(d) for d in s]
@@ -258,8 +269,9 @@ class Overseer(object):
         service = self._get_service(service_name)
         # update scaler config
         scaler = self._get_scaler(service)
+        current_image_version = ImageVersion.deserialize(service['image']['image_info'])
 
-        update_scale_config = make_promise(scaler.fetch_image_config.call_async(service['image'])).then(
+        update_scale_config = make_promise(scaler.fetch_image_config.call_async(current_image_version.unique_image_id)).then(
             partial(self.__update_scale_config, service=service)
         )
 
@@ -289,6 +301,9 @@ class Overseer(object):
 
     def _get_service(self, service_name):
         return self.mongo.services.find_one({'name': service_name})
+
+    def _remove_service(self, service_name):
+        return self.mongo.services.remove({'name': service_name})
 
     def _get_services(self, scaler_type, full_image_id=None):
         q = {
