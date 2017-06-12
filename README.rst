@@ -26,6 +26,36 @@ the plugins that manage the images and the deployment of the services are called
 
 the plugins that monitor the load are called a `monitorer`.
 
+current developement status
+===========================
+
+this library is in heavy developement. it's not expected to work without hard work and debugging.
+
+current delevoppement status:
+
+- auto deploy 50%
+
+  - auto update on push: ok
+  - parse version and upgrade only: ok
+  - dependency requirement: no
+  - helped deployments: no
+
+- monitoring/autoscaling 70%
+
+  - rules parsing: ok
+  - services custom rules: ok
+  - rabbitmq monitoring: wip
+  - scale up/down from rule result: wip
+
+- management 05%
+
+  - rpc call for crud: ok
+  - cli for crud: never
+  - webui for crud: no
+  - live status in webui: no
+
+from now, we can just live upgrade a set of service based on their tags or image name.
+
 
 docker scaller
 ==============
