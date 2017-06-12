@@ -153,7 +153,7 @@ class ScalerDocker(object):
         :param image_id:
         :return:
         """
-        logger.debug("upgrading %s to %s scale=%s", service_name, image_id, scale)
+        logger.info("upgrading %s to %s scale=%s", service_name, image_id, scale)
         service = self._get(service_name=service_name)
         attrs = {}
         if image_id is not None:

@@ -149,7 +149,7 @@ class Overseer(object):
                 )
                 if new_scale_size is not None and current != new_scale_size:
                     extra_args['scale'] = new_scale_size
-                logger.debug("updating %s with %s", service['name'], extra_args)
+                logger.info("updating %s with %s", service['name'], extra_args)
                 self._update_service(service, **extra_args).then(
                     partial(self.__update_scale_config, service=service)
                 )
