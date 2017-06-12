@@ -267,6 +267,8 @@ class Overseer(object):
         :return: the new service config
         """
         service = self._get_service(service_name)
+        if service is None:
+            raise UnknownService(service_name)
         # update scaler config
         scaler = self._get_scaler(service)
         current_image_version = ImageVersion.deserialize(service['image']['image_info'])
@@ -285,13 +287,14 @@ class Overseer(object):
     #                    PRIVATE FUNCTIONS
     # #######################################################
 
+    @log_all
     def _get_scaler(self, scaler):
         if isinstance(scaler, dict):
             # we get a service
             scaler_name = scaler['image']['type']
         else:
             scaler_name = scaler
-        assert scaler_name == 'docker'
+        assert scaler_name == 'docker', "we only support scaler <docker>. %s was asked" % scaler_name
         self.scaler_docker.type = 'docker'
         return self.scaler_docker
 
