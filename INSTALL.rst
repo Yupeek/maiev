@@ -146,6 +146,17 @@ without tls, INSECURE
 
 	docker service create --name scaler_docker --network maeiv -e DOCKER_HOST=tcp://docker_swarm_node:2375  docker.io/yupeek/maiev:scaler_docker-${MAIEV_VERSION}
 
+docker registry auth
+--------------------
+
+to allow access to privates image or registry, you can use docker swarm secrets to pass a specific .docker/config.json file
+which will be used to auth against registry. to do this:
+
+- add a secrets to the swarm, containing your config.json [	`cat ~/.docker/config.json | docker secret create mydockerauthsecret.json -` ]
+- attache this secret while creating the scaler_config service [ `--secret hashofthesecret` ]
+- pass the secret name as an environment variable named DOCKER_CREDENTIALS_SECRET [ `-e DOCKER_CREDENTIALS_SECRET=mydockerauthsecret.json` ]
+
+
 monitorer rabbitmq
 ==================
 

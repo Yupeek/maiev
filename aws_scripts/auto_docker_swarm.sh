@@ -20,6 +20,9 @@
 # else:
 #   just leave the swarm
 
+# the best way to have this behavior is to creat a systemd script like the folowing one.
+# cat - > /etc/systemd/system/auto_docker_swarm.service <<EOF
+#
 # [Unit]
 # Description=start/create/auto-join a docker swarm
 # ConditionPathExists=/opt/auto_docker_swarm.sh
@@ -36,6 +39,19 @@
 #
 # RemainAfterExit=yes
 #
+# EOF
+
+###### usefull tags
+#
+# if the instance is a member of a scalinggroup, the tags of this scaling group will be
+# read to check what behavior is needed at boot time.
+#
+# AUTO_SWARM: if this value is not «on», this script will DO NOTHING
+# DOCKER_TOKER: this tag is set at first launche to store the docker swarm join token. if absent, a new swarm will be
+#               created
+# MANAGER_IP: if this tag exists, the given ip/dns will be used as manager to join an existing cluster.
+# 			  if absent, the ip of a manager is taken by picking a machine of the scaling group different than the current one
+
 
 STATE=$1
 
@@ -51,6 +67,11 @@ function get_scaling_group_of_instance {
     aws autoscaling describe-auto-scaling-groups | jq ".AutoScalingGroups[] | select(.Instances[].InstanceId==\"$I_ID\")"
 }
 
+function get_scaling_tag {
+	SCALING_GROUP=$1
+	TAGNAME=$2
+	aws autoscaling  describe-tags --filters "Name=auto-scaling-group,Values=${SCALING_GROUP}" | jq ".Tags[] | select (.Key==\"${TAGNAME}\") | .Value" -r -e
+}
 
 SCALING_GROUP_DATA=$(get_scaling_group_of_instance "$CURRENT_INSTANCE_ID" )
 SCALING_GROUP_NAME=$(echo "${SCALING_GROUP_DATA}" | jq '.AutoScalingGroupName' -r)
@@ -63,13 +84,16 @@ then
 	exit 0
 fi
 
-MANAGER_ID=$(echo ${SCALING_GROUP_DATA} | jq ".Instances | map(select(.InstanceId!=\"${CURRENT_INSTANCE_ID}\")) | .[0].InstanceId" -r)
-MANAGER_IP=$(get_ip_of_instance ${MANAGER_ID})
+if ! MANAGER_IP=$(get_scaling_tag "${SCALING_GROUP_NAME}" "MANAGER_IP");
+then
+	MANAGER_ID=$(echo ${SCALING_GROUP_DATA} | jq ".Instances | map(select(.InstanceId!=\"${CURRENT_INSTANCE_ID}\")) | .[0].InstanceId" -r)
+	MANAGER_IP=$(get_ip_of_instance ${MANAGER_ID})
+fi
 
 if [ "${STATE}" != "down" ];
 then
 	# state is up, we register or create the swarm
-	if DOCKER_TOKEN=$(aws autoscaling  describe-tags --filters "Name=auto-scaling-group,Values=${SCALING_GROUP_NAME}" --filters "Name=key,Values=DOCKER_TOKEN" | jq ".Tags[0].Value" -e -r) ;
+	if DOCKER_TOKEN=$(get_scaling_tag "${SCALING_GROUP_NAME}" "DOCKER_TOKEN") ;
 	then
 		echo "joining swarm at ${MANAGER_IP}:2377 using token ${DOCKER_TOKEN}"
 		docker swarm join --token "${DOCKER_TOKEN}" ${MANAGER_IP}:2377

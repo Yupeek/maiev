@@ -21,11 +21,19 @@ def split_envs(envs_from_docker):
 
     >>> split_envs(['SITENAME=localhost', 'A=bibi']) == {'SITENAME': 'localhost', 'A': 'bibi'}
     True
+    >>> split_envs(['LABEL=logspout=on', 'A=bibi']) == {'LABEL': 'logspout=on', 'A': 'bibi'}
+    True
+    >>> split_envs(['OOPS']) == {'OOPS': ''}
+    True
 
     :param envs_from_docker:
     :return:
     """
-    return dict(a.split('=') for a in envs_from_docker)
+    res = {}
+    for env_str in envs_from_docker:
+        splited = env_str.split('=')
+        res[splited[0]] = '='.join(splited[1:])
+    return res
 
 
 def parse_full_id(image_full):
@@ -205,7 +213,8 @@ class ScalerDocker(object):
         try:
             result = self.docker.containers.run(image_full_id, 'scale_info', remove=True).decode('utf-8')
         except (docker.errors.NotFound, docker.errors.ContainerError):
-            logger.exception("docker image %s don't contains scale_info executable", image_full_id)
+            logger.info("docker image %s don't contains scale_info executable", image_full_id,)
+            logger.debug("extra error for scaler_info", exc_info=True)
             return None
         else:
             try:

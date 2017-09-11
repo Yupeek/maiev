@@ -32,7 +32,6 @@ class Mongo(DependencyProvider):
         return '%s_mongodb' % self.container.service_cls.name
 
     def start(self):
-
         self.db = MongoClient(self.mongo_uri)[self.db_name]
 
     def stop(self):
