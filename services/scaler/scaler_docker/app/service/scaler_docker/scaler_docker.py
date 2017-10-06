@@ -129,6 +129,10 @@ class ScalerDocker(object):
     :type: eventlet.greenpool.GreenPool
     """
 
+    @http('GET', '/')
+    def ping(self, request):
+        return 'OK'
+
     @http('POST', '/event')
     @log_all
     def event(self, request):
