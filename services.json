@@ -62,6 +62,7 @@
         "-v", "{root}/services/maiev-base/run_dev.sh:/run_dev.sh:ro",
         "-v", "{current_dir}/app/service:/app/service:ro",
         "-v", "{current_dir}/app/scale.json:/app/scale.json:ro",
+        "-v", "{root}/../nameko/nameko:/usr/local/lib/python3.6/site-packages/nameko/",
         "{extra_volume}",
         "-e", "SERVICE_NAME={service_name}",
         "-e FORCE_COLOR=true",

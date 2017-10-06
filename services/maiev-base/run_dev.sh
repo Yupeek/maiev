@@ -45,4 +45,4 @@ asyncRun npm install --prefix /app_dev supervisor concurrently
 
 asyncRun node /app_dev/node_modules/.bin/concurrently --kill-others-on-fail --color -c "black.bgWhite,cyan,red"   \
 		"test ! -f webpack.config.js || ./node_modules/.bin/webpack --watch" \
-	 	"/app_dev/node_modules/.bin/supervisor -w . -e py -n exit -x nameko -- run --backdoor-port 5050 --config config.yaml service.${SERVICE_NAME}.${SERVICE_NAME}"
+	 	"/app_dev/node_modules/.bin/supervisor -w . -e py -n exit -x nameko -- run --config config.yaml service.${SERVICE_NAME}.${SERVICE_NAME}"

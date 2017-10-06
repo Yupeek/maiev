@@ -3,6 +3,7 @@ WEB_SERVER_ADDRESS: '0.0.0.0:8000'
 MONGO_URIS: ${MONGO_URIS:maiev_mongodb}
 
 serializer: json_datecompatible
+max_workers: 10
 
 LOGGING:
   version: 1
