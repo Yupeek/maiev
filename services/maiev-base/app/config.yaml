@@ -18,13 +18,23 @@ LOGGING:
     console:
       class: logging.StreamHandler
       formatter: colored
+      filters: ${CONSOLE_LOG_FILTERS:[]}
+  filters:
+    filtergetroot:
+      (): 'common.logging.FilterGetRoot'
   loggers:
+    root:
+      level: ${ROOT_LOG_LEVEL:CRITICAL}
+      handlers: [console]
     service:
       level: DEBUG
       handlers: [console]
+      propagate: false
     components:
       level: DEBUG
       handlers: [console]
+      propagate: false
     nameko:
       level: ${NAMEKO_LOG_LEVEL:ERROR}
       handlers: [console]
+      propagate: false

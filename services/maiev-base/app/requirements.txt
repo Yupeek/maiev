@@ -1,4 +1,4 @@
-nameko==2.6.0
+nameko==2.8.0
 eventlet==0.21.0
 watchdog
 promise==2.0b1

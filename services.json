@@ -65,6 +65,7 @@
         "{extra_volume}",
         "-e", "SERVICE_NAME={service_name}",
         "-e FORCE_COLOR=true",
+        "{extra_env}",
         "--network={networkname}",
         "--link", "rabbitmq:rabbitmq",
         "--link", "maiev_mongodb:maiev_mongodb",
@@ -85,7 +86,8 @@
     "docker_name": "{service_name}",
     "networkname": "maiev-dev",
     "extra_link": "",
-    "extra_volume": ""
+    "extra_volume": "",
+    "extra_env": ""
   },
   "discover": [
     "services",

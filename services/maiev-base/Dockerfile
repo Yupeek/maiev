@@ -16,8 +16,9 @@ RUN addgroup -g $GROUPID service;  adduser -D -u $USERID -G $(getent group $GROU
 RUN mkdir /app_dev && chown $USERID:$GROUPID /app_dev
 
 RUN apk add --no-cache gcc linux-headers musl-dev nodejs
+COPY ./app/extra_package/ /app/extra_package/
+COPY ./app/requirements.txt ./app/extra_package/ /app/
+RUN cd /app; pip3 install -r requirements.txt && rm requirements.txt
 
 COPY ./app /app
 COPY scale_info.sh /usr/bin/scale_info
-
-RUN cd /app; pip3 install -r requirements.txt && rm requirements.txt
