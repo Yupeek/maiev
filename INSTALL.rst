@@ -82,6 +82,9 @@ each services need a overlay network to comunicate
 	export MONGO_URIS="IP_OR_NAME"
 	export NETWORK_NAME=maiev
 	export MAIEV_VERSION=latest
+	export RABBITMQ_USER=$(echo -n "RABBITMQ_USER : ">&2; read user; echo $user)
+	export RABBITMQ_PASSWORD=$(echo -n "RABBITMQ_PASSWORD : ">&2; read -s password; echo $password)
+	export RABBITMQ_HOST=$(echo -n "RABBITMQ_HOST : ">&2; read host; echo $host)
 
 	docker swarm init  --advertise-addr  $MYADDR
 	docker network create --driver overlay --subnet 10.0.9.0/24 ${NETWORK_NAME}
@@ -110,10 +113,30 @@ the service which manage docker. it must be able to acced a manager node by TCP.
 tls enabled authentication is a realy good idea. the certificate for authentication should be added as
 a swarm secret
 
+with socket mount
+-----------------
+
+this is the easiest way to work with a secure stuff. it just require to run scaler-docker on a manager node.
+
+.. code:: bash
+
+	docker service create \
+		-d=false \
+		--name scaler_docker \
+		--network ${NETWORK_NAME} \
+		--constraint 'node.role == manager' \
+		--mount type=bind,src=//var/run/docker.sock,dst=/var/run/docker.sock \
+		-e RABBITMQ_HOST=${RABBITMQ_HOST} \
+		-e RABBITMQ_USER=${RABBITMQ_USER} \
+		-e RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD} \
+		-e DOCKER_HOST=unix:///var/run/docker.sock \
+		--publish 9007:8000 \
+		docker.io/yupeek/maiev:scaler_docker-${MAIEV_VERSION}
+
 with TLS
 --------
 
-this setup is the most secure. it forbide manipulation of your manager via other service than scaler_docker.
+this setup is secure and don't require to run on a worker. it forbide manipulation of your manager via other service than scaler_docker.
 to achieve this, we use a client/server tls certificate verification. if your docker daemon is started with the configuration
 using tls, the setup is a folow:
 
@@ -164,7 +187,15 @@ the service that fetch rabbitmq metrics to detect load
 
 .. code:: bash
 
-	docker service create --name monitorer_rabbitmq --network=${NETWORK_NAME} -e MONGO_URIS="${MONGO_URIS}" yupeek/maiev:monitorer_rabbitmq-${MAIEV_VERSION}
+	docker service create -d=false \
+		--name monitorer_rabbitmq \
+		--network=${NETWORK_NAME} \
+		-e MONGO_URIS="${MONGO_URIS}" \
+		-e RABBITMQ_HOST=${RABBITMQ_HOST} \
+		-e RABBITMQ_USER=${RABBITMQ_USER} \
+		-e RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD} \
+		yupeek/maiev:monitorer_rabbitmq-${MAIEV_VERSION}
+
 
 trigger
 =======
@@ -173,7 +204,14 @@ thes service that compute each metrics from MQ and send the boolean result to ov
 
 .. code:: bash
 
-	docker service create --name trigger -e MONGO_URIS="${MONGO_URIS}" --network=${NETWORK_NAME} yupeek/maiev:trigger-${MAIEV_VERSION}
+	docker service create -d=false \
+		--name trigger \
+		-e MONGO_URIS="${MONGO_URIS}" \
+		--network=${NETWORK_NAME} \
+		-e RABBITMQ_HOST=${RABBITMQ_HOST} \
+		-e RABBITMQ_USER=${RABBITMQ_USER} \
+		-e RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD} \
+		yupeek/maiev:trigger-${MAIEV_VERSION}
 
 Overseer
 ========
@@ -182,7 +220,14 @@ the real orchestrator service
 
 .. code:: bash
 
-	docker service create --name overseer -e MONGO_URIS="${MONGO_URIS}" --network ${NETWORK_NAME} yupeek/maiev:overseer-${MAIEV_VERSION}
+	docker service create -d=false \
+		--name overseer \
+		--network ${NETWORK_NAME} \
+		-e MONGO_URIS="${MONGO_URIS}" \
+		-e RABBITMQ_HOST=${RABBITMQ_HOST} \
+		-e RABBITMQ_USER=${RABBITMQ_USER} \
+		-e RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD} \
+		yupeek/maiev:overseer-${MAIEV_VERSION}
 
 
 Docker full integration
@@ -190,6 +235,11 @@ Docker full integration
 
 to allow the live update of docker image upon push, your repository must make a notification request to your
 scaler-docker service. to allow that, you must
+
+local registry
+^^^^^^^^^^^^^^
+
+docker service create -d=false --name registry_docker --publish 9003:5000 yupeek/maiev:registry_docker-1.0.17
 
 remote registry
 ^^^^^^^^^^^^^^^
@@ -213,18 +263,4 @@ remote registry
 	  	  timeout: 500ms
 	  	  threshold: 5
 	  	  backoff: 1s
-
-dedicated registry
-^^^^^^^^^^^^^^^^^^
-
-for a dedicated registry, you can use the embded Dockerfile that add a notification push to the scaler-docker host
-
-.. code:: bash
-
-	docker build -f services/scaler/scaler_docker/registry_docer/Dockerfile
-	docker service create
-
-
-
-
 
