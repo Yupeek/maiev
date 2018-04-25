@@ -1,0 +1,9 @@
+{
+  "services": [
+    {
+      "name": "{dirname}",
+      "extends": "docker",
+      "type": "[S]overseer"
+    }
+  ]
+}

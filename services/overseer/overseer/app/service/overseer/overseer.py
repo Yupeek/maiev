@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class Overseer(object):
     """
-    the main orchestation service
+    the main orchestation service. manages upgrades of services and propagate events for new version etc.
 
     public events
     #############
@@ -72,50 +72,6 @@ class Overseer(object):
         service = self._get_service(service_data['name'])
         scaler = self._get_scaler(service)
         self.__update_service_data(service_data, scaler, service)
-
-    @event_handler(
-        'trigger', 'ruleset_triggered', handler_type=SERVICE_POOL
-    )
-    @log_all
-    def on_ruleset_triggered(self, payload):
-        """
-        event send by the trigger service each time a ruleset has changed his state.
-        expected payload ::
-
-            {
-                'ruleset': {'owner': ..., 'name': ..., },
-                'rules_stats': {'rule1': True, 'rule2': False},
-            }
-
-        :return:
-        """
-        logger.debug("ruleset_tirgger payload : %s", payload)
-        assert set(payload.keys()) <= {'ruleset', 'rules_stats'}, \
-            'the payload does not contains the required keys'
-        ruleset = payload['ruleset']
-
-        if ruleset.get('owner') == 'overseer' and ruleset.get('name'):
-            service = self.get_service(ruleset['name'])
-            ruleset = payload['rules_stats']
-            logger.debug("found service %s\n rules changed : %s", service, ruleset)
-
-            self._execute_ruleset(ruleset, service)
-
-    @timer(interval=15)
-    @log_all
-    def recheck_rules(self):
-        now = datetime.datetime.now()
-        for service in self.list_service():
-
-            try:
-                latest_ruleset = service['latest_ruleset']
-                rule, date = latest_ruleset['rule'], latest_ruleset['date']
-            except KeyError:
-                continue
-            logger.debug("latest_ruleset %s ", latest_ruleset)
-            if (rule['__scale_up__'] or rule['__scale_down__']) and \
-                    (now - date).total_seconds() > 30:
-                self._execute_ruleset(rule, service)
 
     @event_handler(
         "scaler_docker", "image_updated", handler_type=SERVICE_POOL, reliable_delivery=False
@@ -225,7 +181,6 @@ class Overseer(object):
             result,
             upsert=True,
         )
-        self._set_trigger_rules(result)
 
     @rpc
     def list_service(self):
@@ -266,8 +221,16 @@ class Overseer(object):
 
     @rpc
     @log_all
-    def get_best_scale(self, service_name):
-        return self._get_best_scale(self._get_service(service_name))
+    def scale(self, service_name, scale):
+        """
+        scale the given service by his name to the given amount of instances.
+        :param str service_name:  the name of the service
+        :param int scale:  the number of instance required (don't check anything)
+        :return:
+        """
+        service = self.get_service(service_name)
+        self._update_service(service, scale=scale)
+
 
     @rpc
     @log_all
@@ -350,66 +313,9 @@ class Overseer(object):
 
         return promise.then(lambda osef: self.reload_from_scaler(service_name=service['name']))
 
-    def _get_best_scale(self, service, delta=0):
-        """
-        return the best scale value for a service.
-        :param service: the service to compute
-        :param delta: the +1 or -1 if the service is in load or not
-        :return: the current scale value and the best one
-        :rtype: tuple(int, int)
-        """
-        mode = service.get('mode', {'name': 'replicated', 'replicas': 1})
-        scale_config = service.get('scale_config') or {}
-
-        if mode['name'] == 'replicated':
-            current = mode['replicas']
-            best = current
-
-            # TODO: compute for load here
-            best += delta
-            # respect max/min from scale_config
-            best = max((best, scale_config.get('min', 0)))
-            best = min((best, scale_config.get('max', best)))
-            return current, best
-        else:
-            return None, None
-
     # ###################################################################
     #                       common method
     # ###################################################################
-
-    def _execute_ruleset(self, ruleset_status, service):
-        """
-        execute the ruleset status by scaling the service
-        :param ruleset_status: the ruleset status given by the trigger ie::
-            {'latency_ok': True,
-            'latency_fail': False,
-            'panic': False,
-            'stable_latency': False,
-            '__scale_up__': False,
-            '__scale_down__': False
-            }
-
-        :param dict service: the service to change
-        """
-        service['latest_ruleset'] = {"date": datetime.datetime.now(), "rule": ruleset_status}
-        self.mongo.services.update(
-            {'name': service['name']},
-            service
-        )
-
-        if ruleset_status.get('__scale_up__'):
-            delta = +1
-        elif ruleset_status.get('__scale_down__'):
-            delta = -1
-        else:
-            delta = 0
-        current, best = self._get_best_scale(service, delta=delta)
-        if current != best:
-            logger.debug("rules triggered new scale: %s => %s", current, best)
-            self._update_service(service, scale=best)
-        else:
-            logger.debug("asked delta of %s: but bestscale still is %s", delta, current)
 
     def __update_service_data(self, service_data, scaler, service):
         """
@@ -446,48 +352,3 @@ class Overseer(object):
             self.mongo.services.update_one({'_id': service['_id']}, {'$set': {"scale_config": new_scale_config}})
             self._set_trigger_rules(service)
             logger.debug("updated scale config for %s" % service['name'])
-
-    def _set_trigger_rules(self, result):
-        # now, we add the trigger config to scale automaticaly this service upon events.
-        ruleset = self._create_trigger_ruleset(result)
-        try:
-            test = self.trigger.compute(ruleset)
-            if test['status'] == 'success':
-                self.trigger.add(ruleset)
-            else:
-                logger.error("imposible to add the ruleset %s: %s", ruleset, test)
-        except UnknownService:
-            logger.error("trigger service is not available. can't set the rules")
-
-    def _create_trigger_ruleset(self, service):
-        """
-        create the trigger ruleset for the given service
-        :param service:
-        :return:
-        """
-
-        rules = []
-        scale_config_ = service.get('scale_config') or {}
-        trigger_config = scale_config_.get('scale', {})
-        for rule in trigger_config.get('rules', ()):
-            if rule['name'] in ("__scale_up__", "__scale_down__"):
-                logger.warning('scale_config contains reserved rule name %s. this one is ignored', rule['name'])
-            else:
-                rules.append(rule)
-        if 'scale_up' in trigger_config:
-            rules.append({
-                'name': '__scale_up__',
-                'expression': trigger_config['scale_up']
-            })
-        if 'scale_down' in trigger_config:
-            rules.append({
-                'name': '__scale_down__',
-                'expression': trigger_config['scale_down']
-            })
-
-        return {
-            'owner': self.name,
-            'name': service['name'],
-            'resources': trigger_config.get('resources', ()),
-            'rules': rules
-        }

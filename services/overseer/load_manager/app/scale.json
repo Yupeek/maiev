@@ -1,0 +1,22 @@
+{
+  "min": 1,
+  "max": 10,
+  "dependences": {
+    "require": [
+
+    ],
+    "provide": {
+      "load_manager:event:scale": 1,
+      "load_manager:event:scale:params": ["scale", "extra_constraints"]
+    },
+    "optional": [
+    ]
+  },
+  "metric": [
+  ],
+  "envs": [
+
+  ],
+  "scale": {
+  }
+}
