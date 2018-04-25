@@ -1,18 +1,27 @@
 {
-  "min": 0,
-  "max": 9,
+  "min": 1,
+  "max": 10,
   "dependences": {
     "required": [
     ],
+    "provide": {
+      "dependency_solver:rpc:solve_dependencies": 1,
+      "dependency_solver:rpc:solve_dependencies:args": ["catalog", "extra_constraints"],
+      "dependency_solver:rpc:solve_dependencies:rtype": ["list"]
+    },
     "optional": [
     ]
   },
+  "metric": [
+  ],
+  "envs": [
+  ],
   "scale": {
     "resources": [
       {
         "name": "rmq",
         "monitorer": "monitorer_rabbitmq",
-        "identifier": "rpc-producer"
+        "identifier": "rpc-overseer_dependency_solver"
       }
     ],
     "rules": [
@@ -22,7 +31,7 @@
       },
       {
         "name": "latency_fail",
-        "expression": "rmq:latency > 5"
+        "expression": "rmq:latency > 15"
       },
       {
         "name": "panic",

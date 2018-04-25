@@ -1,14 +1,13 @@
 # -*- coding: utf-8 -*-
+import datetime
+import itertools
 import logging
 
 import eventlet
-import itertools
-
 from common.dependency import PoolProvider
+from common.dp.GenericRpcProxy import GenericRpcProxy
 from common.utils import log_all
 from nameko.rpc import RpcProxy
-
-from common.entrypoint import once
 from nameko.web.handlers import http
 
 logger = logging.getLogger(__name__)
@@ -40,6 +39,11 @@ class Consumer(object):
     :type: eventlet.greenpool.GreenPool
     """
 
+    generic_rpc = GenericRpcProxy()
+    """
+    :type: common.dp.generic.GenericServiceProxyPool
+    """
+
     # ####################################################
     #                 EVENTS
     # ####################################################
@@ -54,22 +58,25 @@ class Consumer(object):
     #                 RPC
     # ####################################################
 
-    @once
     @log_all
     def start(self):
         logger.debug("starting query ")
         count = 0
         tot = 0
         maxi = 5000
+        begin = datetime.datetime.now()
         while tot < maxi:
             with eventlet.Timeout(1, exception=False):
                 for count in itertools.count():
                     if count + tot > maxi:
                         break
-                    res = self.producer.get.call_async()
+                    self.generic_rpc.get("producer").get()
 
             tot += count
             logger.debug("{} calls/s".format(count))
+        end = datetime.datetime.now()
+        delta = end - begin
+        logger.debug("done %d calls in %d.%d sec", tot, delta.total_seconds(), delta.microseconds)
 
     @http('GET', '/')
     @log_all

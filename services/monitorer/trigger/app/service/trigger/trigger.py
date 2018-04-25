@@ -6,6 +6,7 @@ from functools import partial
 import pymongo
 import pyparsing
 from common.db.mongo import Mongo
+from common.dp.generic import GenericRpcProxy
 from common.entrypoint import once
 from common.utils import filter_dict, log_all
 from nameko.events import EventDispatcher, event_handler
@@ -167,6 +168,8 @@ class Trigger(object):
 
     dispatch = EventDispatcher()
 
+    monitorer_rpc = GenericRpcProxy()
+
     # ####################################################
     #                 ONCE
     # ####################################################
@@ -302,6 +305,9 @@ class Trigger(object):
             ruleset,
             upsert=True,
         )
+        # ask for monitorer to provide queue ressources datas
+        for resource in ruleset['resources']:
+            self.monitorer_rpc.get(resource['monitorer']).track(resource['identifier'])
 
     @rpc
     @log_all

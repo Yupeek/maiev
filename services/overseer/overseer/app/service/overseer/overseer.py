@@ -1,14 +1,16 @@
 # -*- coding: utf-8 -*-
+import datetime
 import logging
 import pprint
 from functools import partial
 
 from common.db.mongo import Mongo
 from common.entrypoint import once
-from common.utils import filter_dict, log_all, make_promise, merge_dict, ImageVersion
+from common.utils import filter_dict, log_all, make_promise, ImageVersion
 from nameko.events import SERVICE_POOL, EventDispatcher, event_handler
 from nameko.exceptions import UnknownService
 from nameko.rpc import RpcProxy, rpc
+from nameko.timer import timer
 from promise.promise import Promise
 
 logger = logging.getLogger(__name__)
@@ -40,7 +42,7 @@ class Overseer(object):
     dispatch = EventDispatcher()
     scaler_docker = RpcProxy("scaler_docker")
     """
-    :type: scaler_docker.ScalerDocker
+    :type: service.scaler_docker.scaler_docker.ScalerDocker
     """
     trigger = RpcProxy('trigger')
     """
@@ -78,11 +80,12 @@ class Overseer(object):
     def on_ruleset_triggered(self, payload):
         """
         event send by the trigger service each time a ruleset has changed his state.
-        expected payload :
-        >>> {
-        ...    'ruleset': {'owner': ..., 'name': ..., },
-        ...    'rules_stats': {'rule1': True, 'rule2': False},
-        ... }
+        expected payload ::
+
+            {
+                'ruleset': {'owner': ..., 'name': ..., },
+                'rules_stats': {'rule1': True, 'rule2': False},
+            }
 
         :return:
         """
@@ -93,21 +96,26 @@ class Overseer(object):
 
         if ruleset.get('owner') == 'overseer' and ruleset.get('name'):
             service = self.get_service(ruleset['name'])
-            result = payload['rules_stats']
-            logger.debug("found service %s\n rules changed : %s", service, result)
-            if result.get('__scale_up__'):
-                delta = +1
-            elif result.get('__scale_down__'):
-                delta = -1
-            else:
-                delta = 0
+            ruleset = payload['rules_stats']
+            logger.debug("found service %s\n rules changed : %s", service, ruleset)
 
-            current, best = self._get_best_scale(service, delta=delta)
-            if current != best:
-                logger.debug("rules triggered new scale: %s => %s", current, best)
-                self._update_service(service, scale=best)
-            else:
-                logger.debug("asked delta of %s: but bestscale still is %s", delta, current)
+            self._execute_ruleset(ruleset, service)
+
+    @timer(interval=15)
+    @log_all
+    def recheck_rules(self):
+        now = datetime.datetime.now()
+        for service in self.list_service():
+
+            try:
+                latest_ruleset = service['latest_ruleset']
+                rule, date = latest_ruleset['rule'], latest_ruleset['date']
+            except KeyError:
+                continue
+            logger.debug("latest_ruleset %s ", latest_ruleset)
+            if (rule['__scale_up__'] or rule['__scale_down__']) and \
+                    (now - date).total_seconds() > 30:
+                self._execute_ruleset(rule, service)
 
     @event_handler(
         "scaler_docker", "image_updated", handler_type=SERVICE_POOL, reliable_delivery=False
@@ -123,20 +131,18 @@ class Overseer(object):
             - [O]version : displayed version
             - [O]digest: the digest for this image
         """
-        logger.debug("received image update notification %s", payload)
         scaler_type = self.reversed_type_to_scaler[payload['from']]
         assert scaler_type == 'docker'
-        assert set(payload) >= {'repository', 'image', 'tag', 'digest'}
+        if set(payload) < {'repository', 'image', 'tag', 'digest'}:
+            return  # update can be called with blob update instead of images
 
         new_image_version = ImageVersion.from_scaler(payload)
         logger.debug("version found for this push : %s", new_image_version)
 
         for service in self._get_services(scaler_type=scaler_type, full_image_id=new_image_version.image_id):
-            logger.debug("check for updating %s", service['name'])
             current_image_version = ImageVersion.deserialize(service['image']['image_info'])
             logger.debug("current image: %s new one : %s", current_image_version, new_image_version)
             if current_image_version == new_image_version:
-                logger.debug("service %s already with the notified image", service['name'])
                 continue
 
             # manage the new scale config
@@ -167,7 +173,7 @@ class Overseer(object):
                 for service in result:
                     if 'rabbitmq' not in service['name']:
                         self.monitor(scaler.type, service['name'])
-        logger.debug("services: %s", pprint.pformat(list(self.mongo.services.find()), indent=2))
+        logger.debug("services: %s", pprint.pformat(list(self.mongo.services.find()), indent=2, width=119))
 
     # ####################################################
     #                 RPC
@@ -193,7 +199,7 @@ class Overseer(object):
         """
         existing_service = self.get_service(service_name)
         if existing_service:
-            logger.error("ask for monitoring an already registered service %s" % service_name)
+            logger.info("ask for monitoring an already registered service  update it%s" % service_name)
 
         scaler = self._get_scaler(scaler_name)
         service_data = scaler.get(service_name=service_name)
@@ -211,9 +217,14 @@ class Overseer(object):
                 "env": service_data.get('env', {}),
                 "secret": [],
             },
+            "latest_ruleset": {},
             "mode": service_data['mode']
         }
-        self.mongo.services.insert_one(result)
+        self.mongo.services.update(
+            {'name': service_name},
+            result,
+            upsert=True,
+        )
         self._set_trigger_rules(result)
 
     @rpc
@@ -267,20 +278,26 @@ class Overseer(object):
         :return: the new service config
         """
         service = self._get_service(service_name)
+        logger.debug("rechargement depuis le scaler: %s", service_name)
         if service is None:
             raise UnknownService(service_name)
         # update scaler config
         scaler = self._get_scaler(service)
         current_image_version = ImageVersion.deserialize(service['image']['image_info'])
 
-        update_scale_config = make_promise(scaler.fetch_image_config.call_async(current_image_version.unique_image_id)).then(
+        update_scale_config = make_promise(
+            scaler.fetch_image_config.call_async(current_image_version.unique_image_id)
+        ).then(
             partial(self.__update_scale_config, service=service)
         )
 
-        update_service = make_promise(scaler.get.call_async(service_name)).then(
-            partial(self.__update_service_data, scaler=scaler, service=service))
-
+        update_service = make_promise(
+            scaler.get.call_async(service_name)
+        ).then(
+            partial(self.__update_service_data, scaler=scaler, service=service)
+        )
         Promise.all([update_scale_config, update_service]).get()
+
         return filter_dict(service)
 
     # #######################################################
@@ -331,7 +348,7 @@ class Overseer(object):
             **kwargs
         ))
 
-        return promise
+        return promise.then(lambda osef: self.reload_from_scaler(service_name=service['name']))
 
     def _get_best_scale(self, service, delta=0):
         """
@@ -361,6 +378,39 @@ class Overseer(object):
     #                       common method
     # ###################################################################
 
+    def _execute_ruleset(self, ruleset_status, service):
+        """
+        execute the ruleset status by scaling the service
+        :param ruleset_status: the ruleset status given by the trigger ie::
+            {'latency_ok': True,
+            'latency_fail': False,
+            'panic': False,
+            'stable_latency': False,
+            '__scale_up__': False,
+            '__scale_down__': False
+            }
+
+        :param dict service: the service to change
+        """
+        service['latest_ruleset'] = {"date": datetime.datetime.now(), "rule": ruleset_status}
+        self.mongo.services.update(
+            {'name': service['name']},
+            service
+        )
+
+        if ruleset_status.get('__scale_up__'):
+            delta = +1
+        elif ruleset_status.get('__scale_down__'):
+            delta = -1
+        else:
+            delta = 0
+        current, best = self._get_best_scale(service, delta=delta)
+        if current != best:
+            logger.debug("rules triggered new scale: %s => %s", current, best)
+            self._update_service(service, scale=best)
+        else:
+            logger.debug("asked delta of %s: but bestscale still is %s", delta, current)
+
     def __update_service_data(self, service_data, scaler, service):
         """
         update thee given service in base and in-memory with service_data
@@ -370,7 +420,6 @@ class Overseer(object):
         # update replicas current status
         service['mode'] = service_data['mode']
         imageversion = ImageVersion.from_scaler(service_data)
-        logger.debug("image version %s", imageversion.data)
         service['image'] = {
             "type": scaler.type,
             "image_info": imageversion.serialize(),
@@ -386,17 +435,19 @@ class Overseer(object):
 
     def __update_scale_config(self, new_scale_config, service):
         scale_config = service.get('scale_config') or {}
-        if new_scale_config:
-            merged = merge_dict(scale_config, new_scale_config)
-            if merged:
-                # the scale config has been updated
-                service['scale_config'] = scale_config
-                self.mongo.services.update_one({'_id': service['_id']}, {'$set': {"scale_config": scale_config}})
-                self._set_trigger_rules(service)
-                logger.debug("updated scale config for %s" % service['name'])
+        logger.debug("get scaler %s fetch config for %s", service['image']['type'], service['image']['full_image_id'])
+        new_scale_config = new_scale_config or self._get_scaler(service['image']['type']).fetch_image_config(
+            service['image']['full_image_id'])
+        logger.debug("old new %s \n\n========\n%s", scale_config, new_scale_config)
+
+        if scale_config != new_scale_config:
+            # the scale config has been updated
+            service['scale_config'] = new_scale_config
+            self.mongo.services.update_one({'_id': service['_id']}, {'$set': {"scale_config": new_scale_config}})
+            self._set_trigger_rules(service)
+            logger.debug("updated scale config for %s" % service['name'])
 
     def _set_trigger_rules(self, result):
-        logger.debug("inserted service %s: \n%s", result['name'], result)
         # now, we add the trigger config to scale automaticaly this service upon events.
         ruleset = self._create_trigger_ruleset(result)
         try:

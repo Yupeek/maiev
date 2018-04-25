@@ -32,6 +32,7 @@ class MonitorerRabbitmq(object):
     """
     :type: components.dependency.rabbitmq.RabbitMqApi
     """
+    services_to_track = {'rpc-producer'}
 
     # ####################################################
     #                 EVENTS
@@ -44,6 +45,7 @@ class MonitorerRabbitmq(object):
     # ####################################################
 
     @rpc
+    @log_all
     def track(self, queue_identifier):
         """
         create a service on the valide scaler
@@ -51,6 +53,7 @@ class MonitorerRabbitmq(object):
         :return:
         """
         logger.debug("will track %s", queue_identifier)
+        self.services_to_track |= {queue_identifier}
 
     # ####################################################
     #                     TIMER
@@ -62,15 +65,16 @@ class MonitorerRabbitmq(object):
 
         import pprint
 
-        metrics = self._compute_queue('rpc-producer')
-        if metrics is not None:
+        for queue_name in self.services_to_track:
+            metrics = self._compute_queue(queue_name)
+            if metrics is not None:
 
-            logger.debug(pprint.pformat(metrics))
-            self.dispatch("metrics_updated", {
-                'monitorer': "monitorer_rabbitmq",
-                'identifier': 'rpc-producer',
-                'metrics': metrics
-            })
+                logger.debug(pprint.pformat(metrics))
+                self.dispatch("metrics_updated", {
+                    'monitorer': "monitorer_rabbitmq",
+                    'identifier': queue_name,
+                    'metrics': metrics
+                })
 
     # ####################################################
     #                 PRIVATE
@@ -84,14 +88,17 @@ class MonitorerRabbitmq(object):
         try:
             stats_ = data['message_stats']
         except KeyError:
-            logger.exception("bad format from rabbitmq data: %r", data)
-            raise
-        prate, drate = stats_['publish_details']['rate'], stats_['deliver_details']['rate']
-        empty_rate = drate - prate
-        try:
-            latency = data['messages_ready'] / stats_['deliver_details']['rate']
-        except ZeroDivisionError:
+            # new queue, never ever had messages
+            prate, drate = 0, 0
             latency = None
+            empty_rate = None
+        else:
+            prate, drate = stats_['publish_details']['rate'], stats_['deliver_details']['rate']
+            empty_rate = drate - prate
+            try:
+                latency = data['messages_ready'] / stats_['deliver_details']['rate']
+            except ZeroDivisionError:
+                latency = None
         return {
             "waiting": data['messages_ready'],
             "latency": latency,
