@@ -3,8 +3,25 @@
   "max": 1,
   "dependences": {
     "require": [
-
     ],
+    "provide": {
+      "monitorer:rabbitmq": true,
+      "monitorer_rabbitmq:event:metrics_updated": 2,
+      "monitorer_rabbitmq:event:metrics_updated:params": [
+        "monitorer",
+        "identifier",
+        "metrics",
+        "metrics.exists",
+        "metrics.waiting",
+        "metrics.latency",
+        "metrics.rate",
+        "metrics.call_rate",
+        "metrics.exec_rate",
+        "metrics.consumers"
+      ],
+      "monitorer_rabbitmq:rpc:track": 1,
+      "monitorer_rabbitmq:rpc:track:args": ["queue_identifier"]
+    },
     "optional": [
     ]
   },

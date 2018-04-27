@@ -30,7 +30,7 @@ class MonitorerRabbitmq(object):
     dispatch = EventDispatcher()
     rabbitmq = RabbitMq()
     """
-    :type: components.dependency.rabbitmq.RabbitMqApi
+    :type: service.dependency.rabbitmq.RabbitMqApi
     """
     services_to_track = {'rpc-producer'}
 
@@ -63,13 +63,9 @@ class MonitorerRabbitmq(object):
     @log_all
     def print_status(self):
 
-        import pprint
-
         for queue_name in self.services_to_track:
             metrics = self._compute_queue(queue_name)
             if metrics is not None:
-
-                logger.debug(pprint.pformat(metrics))
                 self.dispatch("metrics_updated", {
                     'monitorer': "monitorer_rabbitmq",
                     'identifier': queue_name,
@@ -83,8 +79,16 @@ class MonitorerRabbitmq(object):
     def _compute_queue(self, qname):
         data = self.rabbitmq.get_queue_stats(qname, columns='message_stats,messages_ready,consumers')
         if data is None:
-            logger.debug("queue %s does not exists", qname)
-            return
+            # queue don't exists.
+            return {
+                "exists": False,
+                "waiting": 0,
+                "latency": None,
+                "rate": None,
+                "call_rate": 0,
+                "exec_rate": 0,
+                "consumers": 0,
+            }
         try:
             stats_ = data['message_stats']
         except KeyError:
@@ -93,13 +97,15 @@ class MonitorerRabbitmq(object):
             latency = None
             empty_rate = None
         else:
-            prate, drate = stats_['publish_details']['rate'], stats_['deliver_details']['rate']
+            prate = stats_.get('publish_details', {}).get('rate', 0)
+            drate = stats_.get('deliver_details', {}).get('rate', 0)
             empty_rate = drate - prate
             try:
-                latency = data['messages_ready'] / stats_['deliver_details']['rate']
+                latency = data['messages_ready'] / drate
             except ZeroDivisionError:
                 latency = None
         return {
+            "exists": True,
             "waiting": data['messages_ready'],
             "latency": latency,
             "rate": empty_rate,

@@ -1,9 +1,0 @@
-{
-  "services": [
-    {
-      "name": "{dirname}",
-      "extends": "docker",
-      "type": "gui"
-    }
-  ]
-}

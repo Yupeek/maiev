@@ -105,8 +105,8 @@ d__get_latest() {
 	docker_response=$(d__registry__list ${image})
 	if ! echo ${docker_response} | jq '.tags | map(. | select(startswith("'$tag'"))) | reverse |.[0]' -r
 	then
-		echo "error with response from docker " >&2
-		echo "${docker_response}" >&2
+		echo "$0 error with response from docker " >&2
+		echo "$0 ${docker_response}" >&2
 		echo null
 		return 1
 	fi

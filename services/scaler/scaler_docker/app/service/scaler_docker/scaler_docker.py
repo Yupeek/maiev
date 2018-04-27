@@ -216,9 +216,9 @@ class ScalerDocker(object):
             image_full_id = image_full_id.get('image_full_id', None) or recompose_full_id(image_full_id)
         try:
             result = self.docker.containers.run(image_full_id, 'scale_info', remove=True).decode('utf-8')
-        except (docker.errors.NotFound, docker.errors.ContainerError):
-            logger.info("docker image %s don't contains scale_info executable", image_full_id,)
-            logger.debug("extra error for scaler_info", exc_info=True)
+        except (docker.errors.NotFound, docker.errors.ContainerError) as e:
+            if "executable file not found in " not in str(e):
+                logger.debug("extra error for scaler_info", exc_info=True)
             return None
         else:
             try:

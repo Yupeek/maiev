@@ -228,6 +228,7 @@ class Overseer(object):
         :param int scale:  the number of instance required (don't check anything)
         :return:
         """
+        logger.debug("scaling service %s to %s", service_name, scale)
         service = self.get_service(service_name)
         self._update_service(service, scale=scale)
 
@@ -305,7 +306,6 @@ class Overseer(object):
         :param kwargs:
         :rtype: Promise
         """
-
         promise = make_promise(self._get_scaler(service).update.call_async(
             service_name=service['name'],
             **kwargs

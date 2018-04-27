@@ -71,7 +71,7 @@
         "--link", "maiev_mongodb:maiev_mongodb",
         "{extra_link}",
         "--name={docker_name}",
-        "{service_name}",
+        "{image_name}",
         "/run_dev.sh"],
       "execStop": ["/usr/bin/docker", "stop", "{docker_name}"],
       "require": [
@@ -85,6 +85,7 @@
     "service_name": "{dirname}",
     "docker_name": "{service_name}",
     "networkname": "maiev-dev",
+    "image_name": "{service_name}:dev",
     "extra_link": "",
     "extra_volume": "",
     "extra_env": ""

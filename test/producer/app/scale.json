@@ -33,7 +33,7 @@
         "expression": "rules:latency_ok and rules:latency_ok:since > \"30s\""
       }
     ],
-    "scale_up": "rules:panic or (rmq:consumers == 0 and rmq:waiting > 0)",
+    "scale_up": "rules:panic or (rmq:consumers == 0 and rmq:waiting > 0) or not rmq:exists",
     "scale_down": "rules:stable_latency and rmq:consumers > 0"
   }
 }

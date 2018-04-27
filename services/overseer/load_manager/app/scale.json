@@ -3,7 +3,10 @@
   "max": 10,
   "dependences": {
     "require": [
-
+      "overseer:rpc:scale",
+      "\"scale\" in overseer:rpc:scale:args",
+      "trigger:rpc:delete",
+      "{\"owner\", \"rule_name\" in trigger:rpc:delete:args"
     ],
     "provide": {
       "load_manager:event:scale": 1,

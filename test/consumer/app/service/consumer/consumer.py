@@ -5,7 +5,7 @@ import logging
 
 import eventlet
 from common.dependency import PoolProvider
-from common.dp.GenericRpcProxy import GenericRpcProxy
+from common.dp.generic import GenericRpcProxy
 from common.utils import log_all
 from nameko.rpc import RpcProxy
 from nameko.web.handlers import http

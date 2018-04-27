@@ -7,11 +7,10 @@ DOCKER = docker
 GROUPID ?= $(shell id -g)
 
 SERVICE_NAME ?= $(shell basename $(CURDIR))
-IMAGE_NAME ?= ganymede
+IMAGE_NAME ?= maiev
 CURRENT_MAKEFILE := $(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 SCRIPTS_DIR = $(shell dirname ${CURRENT_MAKEFILE})/../scripts/
 TEST_CMD ?= /app/test.sh
-NETWORK_NAME ?= ganymede
 
 # updated values
 
@@ -40,7 +39,7 @@ clean:
 
 # === BUILD / UPDATE  DOCKER IMAGES
 
-build-image:  ## build this image docker
+build-image:  ## build this image docker 2
 	@test ! -z "$(TARGET)" || (printf "\033[31;1m build image is now specialized.\033[0m\
 	 	please set \033[35mTARGET\033[0m env to either \033[36mdev\033[0m, \033[36mprod\033[0m or \033[36mtest\033[0m\n" && /bin/false)
 
@@ -49,7 +48,7 @@ build-image:  ## build this image docker
 		--build-arg VERSION=$(IMAGE_VERSION) \
 		--build-arg TARGET=$(TARGET) \
 		--build-arg USERID=$(shell id -u) \
-		--build-arg GROUPID=$(shell id -g) \
+		--build-arg GROUPID=$(GROUPID)\
         $(DOCKER_BUILD_ARGS) \
 		-t $(TMP_IMAGE_NAME) \
 		.

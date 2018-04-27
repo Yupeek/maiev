@@ -64,7 +64,6 @@ class LoadManager(BaseWorkerService):
             }
 
         """
-        logger.debug("ruleset_tirgger payload : %s", payload)
         assert set(payload.keys()) <= {'ruleset', 'rules_stats'}, \
             'the payload does not contains the required keys'
         ruleset = payload['ruleset']
@@ -72,7 +71,6 @@ class LoadManager(BaseWorkerService):
         if ruleset.get('owner') == self.name and ruleset.get('name'):
             service = self._get_service(ruleset['name'])
             ruleset = payload['rules_stats']
-            logger.debug("found service %s\n rules changed : %s", service, ruleset)
             self._execute_ruleset(ruleset, service)
 
     @timer(interval=15)
@@ -86,7 +84,6 @@ class LoadManager(BaseWorkerService):
                 rule, date = latest_ruleset['rule'], latest_ruleset['date']
             except KeyError:
                 continue
-            logger.debug("latest_ruleset %s ", latest_ruleset)
             if (rule['__scale_up__'] or rule['__scale_down__']) and \
                     (now - date).total_seconds() > 30:
                 self._execute_ruleset(rule, service)
@@ -100,6 +97,11 @@ class LoadManager(BaseWorkerService):
         :param service: the service with his name and his scaler_config
         :return:
         """
+        self.mongo.services.update(
+            {'name': service['name']},
+            service,
+            upsert=True,
+        )
         self._set_trigger_rules(service['name'], service['scale_config']['scale'])
 
     @rpc
@@ -188,10 +190,8 @@ class LoadManager(BaseWorkerService):
 
         current, best = self._get_best_scale(service, delta=delta)
         if current != best:
-            logger.debug("rules triggered new scale: %s => %s", current, best)
+            logger.info("rules triggered new scale: %s => %s", current, best)
             self.overseer.scale(service['name'], scale=best)
-        else:
-            logger.debug("asked delta of %s: but bestscale still is %s", delta, current)
 
     def _get_best_scale(self, service, delta=0):
         """

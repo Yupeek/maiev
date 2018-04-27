@@ -37,3 +37,6 @@ install:  ## init current docker to swarm for test
 		--replicas 1 --network=$(NETWORK_NAME) $(DOCKER_REPO)/scaler_docker  && sleep 1
 	-docker service create --name registry_docker --publish 5000:5000 \
 		--replicas 1 --network=$(NETWORK_NAME) $(DOCKER_REPO)/registry_docker  && sleep 1
+
+dev:
+	TARGET=dev $(MAKE) build-image
