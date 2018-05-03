@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 
 import logging
-from functools import partial, reduce
-
-from common.base import BaseWorkerService
-from common.utils import log_all
-from nameko.rpc import rpc
+from functools import partial
 
 from booleano.exc import ScopeError
 from booleano.operations.variables import BooleanVariable, variable_symbol_table_builder
 from booleano.parser import Bind, Grammar, SymbolTable
 from booleano.parser.core import EvaluableParseManager
+from nameko.rpc import rpc
+
+from common.base import BaseWorkerService
+from common.utils import log_all
 
 logger = logging.getLogger(__name__)
 
@@ -237,7 +237,8 @@ class DependencySolver(BaseWorkerService):
                             name: "myservice"
                             versions:
                                 provide: {"rpc:holle": 1, "rpc:hello:args": ["name"]}
-                                require: ["myservice:rpc:hello", "myservice:rpc:hello>1", "'name' in myservice:rpc:hello:args"]
+                                require: ["myservice:rpc:hello", "myservice:rpc:hello>1",
+                                          "'name' in myservice:rpc:hello:args"]
 
         :param list extra_constraints: list of extra constraints if required (same form as service's require)
         :return: all possibles versions folowing the given constraints

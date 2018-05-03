@@ -5,14 +5,15 @@ import logging
 import pprint
 from functools import partial
 
-from common.db.mongo import Mongo
-from common.entrypoint import once
-from common.utils import ImageVersion, filter_dict, log_all, make_promise
 from nameko.events import SERVICE_POOL, EventDispatcher, event_handler
 from nameko.exceptions import UnknownService
 from nameko.rpc import RpcProxy, rpc
 from nameko.timer import timer
 from promise.promise import Promise
+
+from common.db.mongo import Mongo
+from common.entrypoint import once
+from common.utils import ImageVersion, filter_dict, log_all, make_promise
 
 logger = logging.getLogger(__name__)
 

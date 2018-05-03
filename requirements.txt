@@ -11,3 +11,4 @@ pytz
 requests
 semantic_version==2.6.0
 watchdog
+docker

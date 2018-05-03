@@ -5,8 +5,9 @@ import logging
 from unittest import TestCase
 
 import mock
-from common.db.mongo import MongoTemporaryInstance
 from nameko.testing.services import worker_factory
+
+from common.db.mongo import MongoTemporaryInstance
 from service.trigger.trigger import Trigger, get_now
 
 logger = logging.getLogger(__name__)

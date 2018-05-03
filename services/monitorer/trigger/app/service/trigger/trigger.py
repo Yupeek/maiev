@@ -5,18 +5,18 @@ from functools import partial
 
 import pymongo
 import pyparsing
-from common.db.mongo import Mongo
-from common.dp.generic import GenericRpcProxy
-from common.entrypoint import once
-from common.utils import filter_dict, log_all
-from nameko.events import EventDispatcher, event_handler
-from nameko.rpc import rpc
-
 from booleano.operations.operands.constants import Constant
 from booleano.operations.variables import BooleanVariable, DurationVariable
 from booleano.parser.core import EvaluableParseManager
 from booleano.parser.grammar import Grammar
 from booleano.parser.scope import Bind, SymbolTable
+from nameko.events import EventDispatcher, event_handler
+from nameko.rpc import rpc
+
+from common.db.mongo import Mongo
+from common.dp.generic import GenericRpcProxy
+from common.entrypoint import once
+from common.utils import filter_dict, log_all
 
 logger = logging.getLogger(__name__)
 

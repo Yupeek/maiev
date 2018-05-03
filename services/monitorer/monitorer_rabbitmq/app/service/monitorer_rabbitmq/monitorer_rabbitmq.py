@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 import logging
 
-from common.utils import log_all
 from nameko.events import EventDispatcher
 from nameko.rpc import rpc
 from nameko.timer import timer
 
+from common.utils import log_all
 from service.dependency.rabbitmq import RabbitMq
 
 logger = logging.getLogger(__name__)

@@ -6,8 +6,9 @@ from unittest.case import TestCase, skip
 
 import pytest
 from bson import ObjectId
-from common.utils import filter_dict
 from nameko.testing.services import worker_factory
+
+from common.utils import filter_dict
 from service.overseer.overseer import Overseer
 
 logger = logging.getLogger(__name__)

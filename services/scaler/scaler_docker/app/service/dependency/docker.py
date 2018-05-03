@@ -13,7 +13,7 @@ class DockerClientProvider(DependencyProvider):
     def setup(self):
         docker_cfg = self.container.config.get('DOCKER')
         if docker_cfg:
-            self.client = client.DockerClient(**docker_cfg)
+            self.client = client.Client(**docker_cfg)
         else:
             self.client = client.from_env()
         self.client.info()

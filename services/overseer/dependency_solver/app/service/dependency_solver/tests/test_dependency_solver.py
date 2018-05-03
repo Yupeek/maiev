@@ -2,9 +2,6 @@
 import copy
 import logging
 
-import mock
-# other MS
-import pytest
 from service.dependency_solver.dependency_solver import Solver
 
 logger = logging.getLogger(__name__)

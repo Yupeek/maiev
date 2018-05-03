@@ -5,13 +5,14 @@ import logging
 import pprint
 
 import docker.errors
-from common.dependency import PoolProvider
-from common.entrypoint import once
-from common.utils import log_all
 from docker.types.services import ServiceMode
 from nameko.events import EventDispatcher
 from nameko.rpc import rpc
 from nameko.web.handlers import http
+
+from common.dependency import PoolProvider
+from common.entrypoint import once
+from common.utils import log_all
 from service.dependency.docker import DockerClientProvider
 
 logger = logging.getLogger(__name__)
@@ -159,6 +160,7 @@ class ScalerDocker(object):
                     self._parse_event_from_hub(data)
             except Exception:
                 logger.exception("error while receiving docker push notification")
+
         self.pool.spawn(propagate_events)
 
         return ''
@@ -301,7 +303,7 @@ class ScalerDocker(object):
             'image': data['repository']['name'],
             'repository': data['repository']['namespace'],
             'full_image_id': '%s/%s:%s' % (data['repository']['namespace'], data['repository']['name'],
-                                                        push_data['tag']), 'tag': push_data['tag']
+                                           push_data['tag']), 'tag': push_data['tag']
         }
 
         try:
