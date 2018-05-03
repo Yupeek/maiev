@@ -1,6 +1,6 @@
 
 .DEFAULT_GOAL := all
-SUBDIRS := $(shell find services -not -path "*node_modules*" -and  -name Makefile | xargs "dirname" )
+SUBDIRS := services
 .PHONY: clean $(SUBDIRS)
 NETWORK_NAME ?= maiev
 LOCAL_IP ?= $(shell ip a s | awk '/inet /{print $$2}' | grep -v 127.0.0.1 | head -n 1 |  cut -d/ -f 1)
@@ -18,6 +18,8 @@ all:   ## build all docker images, tools and etc
 build: $(SUBDIRS) ## build all micro-services's docker images.
 
 deploy: $(SUBDIRS)
+
+test: $(SUBDIRS)
 
 $(SUBDIRS):
 	    $(MAKE) -C $@ $(MAKECMDGOALS)

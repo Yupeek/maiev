@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
-
+import datetime
 import json
 import logging
+import pprint
 
 import docker.errors
 from common.dependency import PoolProvider
+from common.entrypoint import once
 from common.utils import log_all
 from docker.types.services import ServiceMode
 from nameko.events import EventDispatcher
@@ -129,6 +131,10 @@ class ScalerDocker(object):
     :type: eventlet.greenpool.GreenPool
     """
 
+    # ####################################################
+    #   HTTP endpoints
+    # ####################################################
+
     @http('GET', '/')
     def ping(self, request):
         return 'OK'
@@ -157,6 +163,25 @@ class ScalerDocker(object):
 
         return ''
 
+    # ####################################################
+    #   Once endpoints
+    # ####################################################
+
+    @once
+    @log_all
+    def start_listen_events(self):
+        for event in self.docker.events(since=datetime.datetime.now(), decode=True):
+            if event['Action'] == 'update':
+                self.dispatch('service_updated', {
+                    'service': self.get(service_id=event['Actor']['ID']),
+                    'attributes': event['Actor']['Attributes'],
+                })
+                pprint.pprint(event)
+
+    # ####################################################
+    #  RPC endpoints
+    # ####################################################
+
     @rpc
     @log_all
     def update(self, service_name, image_id=None, scale=None):
@@ -175,7 +200,7 @@ class ScalerDocker(object):
                 attrs['mode'] = ServiceMode('global', 1)
             else:
                 attrs['mode'] = ServiceMode('replicated', scale)
-        service.update_preserve(**attrs)
+        service.update(fetch_current_spec=True, **attrs)
 
         self.dispatch('service_updated', {'service': self.get(service_id=service.id)})
 

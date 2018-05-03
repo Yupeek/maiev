@@ -2,12 +2,12 @@
 import datetime
 import logging
 
-from common.db.mongo import Mongo
 from common.base import BaseWorkerService
+from common.db.mongo import Mongo
 from common.utils import log_all
-from nameko.events import event_handler, SERVICE_POOL
+from nameko.events import SERVICE_POOL, event_handler
 from nameko.exceptions import UnknownService
-from nameko.rpc import rpc, RpcProxy
+from nameko.rpc import RpcProxy, rpc
 from nameko.timer import timer
 
 logger = logging.getLogger(__name__)

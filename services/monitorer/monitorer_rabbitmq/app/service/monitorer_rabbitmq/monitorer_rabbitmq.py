@@ -5,6 +5,7 @@ from common.utils import log_all
 from nameko.events import EventDispatcher
 from nameko.rpc import rpc
 from nameko.timer import timer
+
 from service.dependency.rabbitmq import RabbitMq
 
 logger = logging.getLogger(__name__)
@@ -55,13 +56,23 @@ class MonitorerRabbitmq(object):
         logger.debug("will track %s", queue_identifier)
         self.services_to_track |= {queue_identifier}
 
+    @rpc
+    @log_all
+    def get_queue_stats(self, queue_name, columns='message_stats,messages_ready,consumers'):
+        return self.rabbitmq.get_queue_stats(queue_name, columns=columns)
+
+    @rpc
+    @log_all
+    def compute_queue(self, queue_name):
+        return self._compute_queue(queue_name)
+
     # ####################################################
     #                     TIMER
     # $###################################################
 
     @timer(interval=5)
     @log_all
-    def print_status(self):
+    def time_tick(self):
 
         for queue_name in self.services_to_track:
             metrics = self._compute_queue(queue_name)

@@ -3,13 +3,14 @@
 import logging
 from functools import partial, reduce
 
-from booleano.exc import ScopeError
-from booleano.operations.variables import variable_symbol_table_builder, BooleanVariable
-from booleano.parser import SymbolTable, Bind, Grammar
-from booleano.parser.core import EvaluableParseManager
 from common.base import BaseWorkerService
 from common.utils import log_all
 from nameko.rpc import rpc
+
+from booleano.exc import ScopeError
+from booleano.operations.variables import BooleanVariable, variable_symbol_table_builder
+from booleano.parser import Bind, Grammar, SymbolTable
+from booleano.parser.core import EvaluableParseManager
 
 logger = logging.getLogger(__name__)
 
@@ -243,4 +244,3 @@ class DependencySolver(BaseWorkerService):
         """
         s = Solver(catalog, extra_constraints)
         return list(s.solve())
-

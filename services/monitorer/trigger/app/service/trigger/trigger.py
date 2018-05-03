@@ -205,6 +205,7 @@ class Trigger(object):
             'the payload does not contains the required keys'
 
         q = {'resources.monitorer': payload['monitorer'], 'resources.identifier': payload['identifier']}
+
         for ruleset in self.mongo.rulesets.find(q):
             for resource in ruleset['resources']:
                 if resource['monitorer'] == payload['monitorer'] and resource['identifier'] == payload['identifier']:

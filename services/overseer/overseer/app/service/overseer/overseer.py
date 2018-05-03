@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import copy
 import datetime
 import logging
 import pprint
@@ -6,7 +7,7 @@ from functools import partial
 
 from common.db.mongo import Mongo
 from common.entrypoint import once
-from common.utils import filter_dict, log_all, make_promise, ImageVersion
+from common.utils import ImageVersion, filter_dict, log_all, make_promise
 from nameko.events import SERVICE_POOL, EventDispatcher, event_handler
 from nameko.exceptions import UnknownService
 from nameko.rpc import RpcProxy, rpc
@@ -63,15 +64,49 @@ class Overseer(object):
     # ####################################################
 
     @event_handler(
-        "scaler_docker", "service_updated", handler_type=SERVICE_POOL, reliable_delivery=False
+        "scaler_docker", "service_updated", handler_type=SERVICE_POOL, reliable_delivery=True
     )
     @log_all
     def on_service_updated(self, payload):
         logger.debug("notified service updated with %s", payload)
         service_data = payload['service']
         service = self._get_service(service_data['name'])
+        diff = self._compute_diff(service_data, service)
         scaler = self._get_scaler(service)
-        self.__update_service_data(service_data, scaler, service)
+        self._save_service_state(service_data, scaler, service)
+        if diff:
+            self.dispatch('service_updated', {"service": filter_dict(service), "diff": diff})
+
+    @event_handler(
+        "overseer", "service_updated", handler_type=SERVICE_POOL, reliable_delivery=True
+    )
+    @log_all
+    def check_new_scaler_config(self, payload):
+        """
+        check if the image is changed, this mean a new scaler-config is changed too ?
+        :param dict payload: the payload sent by self.on_service_updated
+        :return:
+        """
+        diff = payload['diff']
+        if diff.get('image'):
+            image_version = ImageVersion.deserialize(diff['image']['to'])
+            scale_config = self.scaler_docker.fetch_image_config(image_version.unique_image_id)
+            service_ = payload['service']
+            if service_['scale_config'] != scale_config:
+                self.mongo.services.update_one(
+                    {'name': service_['name']},
+                    {'$set': {
+                        "scale_config": scale_config,
+                    }}
+                )
+                diff = {
+                    "scale_config": {'from': copy.deepcopy(service_['scale_config']), 'to': scale_config},
+                }
+                service_['scale_config'] = scale_config
+                self.dispatch('service_updated', {
+                    'service': service_,
+                    'diff': diff,
+                })
 
     @event_handler(
         "scaler_docker", "image_updated", handler_type=SERVICE_POOL, reliable_delivery=False
@@ -101,20 +136,7 @@ class Overseer(object):
             if current_image_version == new_image_version:
                 continue
 
-            # manage the new scale config
-            new_scale_config = payload['scale_config'] or {}
-
-            if new_scale_config.get('auto_update', True) and new_image_version > current_image_version:
-                current, new_scale_size = self._get_best_scale(service)
-                extra_args = dict(
-                    image_id=new_image_version.unique_image_id
-                )
-                if new_scale_size is not None and current != new_scale_size:
-                    extra_args['scale'] = new_scale_size
-                logger.info("updating %s with %s", service['name'], extra_args)
-                self._update_service(service, **extra_args).then(
-                    partial(self.__update_scale_config, service=service)
-                )
+            # TODO: change behavior and use dependency
 
     # ####################################################
     #                 ONCE
@@ -258,7 +280,7 @@ class Overseer(object):
         update_service = make_promise(
             scaler.get.call_async(service_name)
         ).then(
-            partial(self.__update_service_data, scaler=scaler, service=service)
+            partial(self._save_service_state, scaler=scaler, service=service)
         )
         Promise.all([update_scale_config, update_service]).get()
 
@@ -317,7 +339,7 @@ class Overseer(object):
     #                       common method
     # ###################################################################
 
-    def __update_service_data(self, service_data, scaler, service):
+    def _save_service_state(self, service_data, scaler, service):
         """
         update thee given service in base and in-memory with service_data
         :param service:
@@ -338,6 +360,31 @@ class Overseer(object):
                 "image": service['image'],
             }}
         )
+
+    def _compute_diff(self, service_data, service):
+        """
+        return a dict with the diff between the old state and the new state of a service.
+        currently check: scale, images, scale_config, env.
+        {"change item": {"from": oldval, "to": newval}}
+        :param service_data: the data of the service from the changed event
+        :param service: the service as saved in the database befor the change.
+        :return: the dict with the changes. in form: {'from': ..., 'to': ...} with the folowing parts:
+
+            - scale: the number of instances
+            - mode: the mode if changes (name + replicas)
+            - image: the imageversion serialized if changed
+
+        """
+        changes = {}
+        if service_data['mode'] != service['mode']:
+            if service_data['mode']['name'] == "replicated" and service['mode']['name'] == "replicated":
+                changes['scale'] = {'from': service['mode']['replicas'], 'to': service_data['mode']['replicas']}
+            else:
+                changes['mode'] = {'from': service['mode'], 'to': service_data['mode']}
+        img_version_serialized = ImageVersion.from_scaler(service_data).serialize()
+        if img_version_serialized != service['image']['image_info']:
+            changes['image'] = {'from': service['image']['image_info'], 'to': img_version_serialized}
+        return changes
 
     def __update_scale_config(self, new_scale_config, service):
         scale_config = service.get('scale_config') or {}

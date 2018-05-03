@@ -5,7 +5,6 @@ import mock
 # other MS
 import pytest
 
-
 logger = logging.getLogger(__name__)
 
 

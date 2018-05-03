@@ -3,7 +3,14 @@
     {
       "name": "{dirname}",
       "extends": "docker",
-      "type": "[S]overseer"
+      "type": "[S]overseer",
+      "require": [
+        "super()",
+        "overseer",
+        "trigger",
+        "mongodb"
+      ]
+
     }
   ]
 }

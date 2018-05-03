@@ -11,6 +11,7 @@ IMAGE_NAME ?= maiev
 CURRENT_MAKEFILE := $(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 SCRIPTS_DIR = $(shell dirname ${CURRENT_MAKEFILE})/../scripts/
 TEST_CMD ?= /app/test.sh
+MAIN_DIR ?= service
 
 # updated values
 
@@ -97,11 +98,11 @@ dev:  ## build images with target dev
 
 test-flake8: ## Run flake8 tests
 	$(DOCKER) run $(DOCKER_TEST_ARGS) -i $(FLAG_TEAMCITY_VERSION) --rm $(TMP_IMAGE_NAME) \
-		flake8 service --max-complexity 10 || /bin/true  # teamcity-messages will send errors
+		flake8 $(MAIN_DIR) --max-complexity 10 || /bin/true  # teamcity-messages will send errors
 
 test-isort: ## run isort check
 	$(DOCKER) run $(DOCKER_TEST_ARGS) -i $(FLAG_TEAMCITY_VERSION) --rm $(TMP_IMAGE_NAME) \
-		isort -rc service  -c  --diff
+		isort -rc $(MAIN_DIR)  -c  --diff
 
 test-quality: test-flake8 test-isort
 
@@ -115,8 +116,8 @@ test: build-image test-quality
 
 pre-commit-test:
 	$(DOCKER) run $(DOCKER_TEST_ARGS) -i $(FLAG_TEAMCITY_VERSION) -e FORCE_COLOR=true --rm \
-		-v $(shell pwd)/app/service/:/app/service/ $(TMP_IMAGE_NAME) \
-		sh -c "flake8 service --max-complexity 10 || /bin/true ; isort -rc service  -c  --diff"
+		-v $(shell pwd)/app/$(MAIN_DIR)/:/app/$(MAIN_DIR)/ $(TMP_IMAGE_NAME) \
+		sh -c "flake8 $(MAIN_DIR) --max-complexity 10 || /bin/true ; isort -rc $(MAIN_DIR)  -c  --diff"
 
 # === META
 

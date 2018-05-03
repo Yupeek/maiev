@@ -194,8 +194,11 @@ class ImageVersion(object):
         :return:
         """
         d, o = self.data, other.data
-        return d['repository'] == o['repository'] and d['image'] == o['image'] \
-               and d['species'] == o['species']
+        return (
+            d['repository'] == o['repository'] and
+            d['image'] == o['image'] and
+            d['species'] == o['species']
+        )
 
     def __eq__(self, other):
         if not self.is_same_image(other):
@@ -212,26 +215,29 @@ class ImageVersion(object):
     def __lt__(self, other):
         sv = self.data['version']
         ov = other.data['version']
-        return self.is_same_image(other) and \
-            sv is not None and \
-            ov is not None and \
-            sv != 'latest' and \
+        return (
+            self.is_same_image(other) and
+            sv is not None and
+            ov is not None and
+            sv != 'latest' and
             (
                 ov == 'latest' or
                 self.version < other.version
             )
+        )
 
     def __gt__(self, other):
         sv = self.data['version']
         ov = other.data['version']
-        return self.is_same_image(other) and \
-               sv is not None and \
-               ov is not None and \
-               (
-                   sv == 'latest' or
-                   self.version > other.version
-
-               )
+        return (
+            self.is_same_image(other) and
+            sv is not None and
+            ov is not None and
+            (
+                sv == 'latest' or
+                self.version > other.version
+            )
+        )
 
     @property
     def version(self):
