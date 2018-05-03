@@ -1,4 +1,4 @@
-TOPTARGETS := build-image deploy test pre-commit-test dev
+TOPTARGETS := build-image deploy test pre-commit-test dev echo-path
 
 SERVICES := $(wildcard */)
 

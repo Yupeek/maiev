@@ -2,12 +2,15 @@
 import copy
 import datetime
 import logging
+import os
+import random
 from unittest import TestCase
 
 import mock
 from nameko.testing.services import worker_factory
+from pymongo import MongoClient
 
-from common.db.mongo import MongoTemporaryInstance
+from common.db.mongo import Mongo
 from service.trigger.trigger import Trigger, get_now
 
 logger = logging.getLogger(__name__)
@@ -452,19 +455,20 @@ class TestConputeResults(TriggerTestcase):
 
 
 class WithDbTestTrigger(TriggerTestcase):
+    dbname = "test_maiev_%d" % random.randint(0, 65535)
     @classmethod
     def setUpClass(cls):
-        cls.db = MongoTemporaryInstance.get_instance()
+        cls.mongo_cnx = MongoClient(os.environ.get('MONGO_TEST_URI', "localhost"))
+        cls.db = cls.mongo_cnx[cls.dbname]
         super(WithDbTestTrigger, cls).setUpClass()
 
     def tearDown(self):
         super(WithDbTestTrigger, self).setUp()
-        for db_name in self.db.conn.database_names():
-            self.db.conn.drop_database(db_name)
+        self.mongo_cnx.drop_database(self.dbname)
 
     def setUp(self):
         super(WithDbTestTrigger, self).setUp()
-        self.service = worker_factory(Trigger, mongo=self.db.conn[Trigger.name])  # type: Trigger
+        self.service = worker_factory(Trigger, mongo=self.db)  # type: Trigger
         self.rulesets = self.service.mongo.rulesets
 
 

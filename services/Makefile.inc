@@ -119,6 +119,9 @@ pre-commit-test:
 		-v $(shell pwd)/app/$(MAIN_DIR)/:/app/$(MAIN_DIR)/ $(TMP_IMAGE_NAME) \
 		sh -c "flake8 $(MAIN_DIR) --max-complexity 10 || /bin/true ; isort -rc $(MAIN_DIR)  -c  --diff"
 
+echo-path:
+	@echo $(shell realpath --relative-to="$(shell dirname $(CURRENT_MAKEFILE))" .)
+
 # === META
 
 all: build-image

@@ -301,7 +301,7 @@ class Trigger(object):
         """
         logger.debug("added ruleset %s", {'owner': ruleset['owner'], 'name': ruleset['name']})
         ruleset = self._validate_ruleset(ruleset)
-        self.mongo.rulesets.update(
+        self.mongo.rulesets.replace_one(
             {'owner': ruleset['owner'], 'name': ruleset['name']},
             ruleset,
             upsert=True,

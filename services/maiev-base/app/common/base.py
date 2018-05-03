@@ -2,9 +2,10 @@
 import logging
 import pydoc
 
-from common.utils import log_all
 from nameko.dependency_providers import Config
 from nameko.rpc import rpc
+
+from common.utils import log_all
 
 logger = logging.getLogger(__name__)
 
