@@ -74,6 +74,29 @@ class LoadManager(BaseWorkerService):
             ruleset = payload['rules_stats']
             self._execute_ruleset(ruleset, service)
 
+    @event_handler(
+        'overseer', 'service_updated', handler_type=SERVICE_POOL
+    )
+    @log_all
+    def on_service_updated(self, payload):
+        service = payload.get('service')
+        diff = payload.get('diff')
+        my_service = self._get_service(service['name'])
+        if my_service is None:
+            return  # this service is not monitored by us
+
+        if 'scale' in diff or 'mode' in diff:
+            my_service['mode'] = service['mode']
+        if 'scale_config' in diff:
+            my_service['scale_config'] = service['scale_config']
+            self._set_trigger_rules(service['name'], service['scale_config']['scale'])
+
+        self.mongo.services.update(
+            {'name': service['name']},
+            my_service,
+            upsert=True,
+        )
+
     @timer(interval=15)
     @log_all
     def recheck_rules(self):
@@ -116,7 +139,43 @@ class LoadManager(BaseWorkerService):
     # #######################################
 
     def _get_service(self, service_name):
+        """
+        return the service as stored in database. ie::
+
+            {
+                "scale_config": {
+                    "scale": {
+                        "rules": [
+                            {"expression": "rmq:waiting == 0 or rmq:latency < 0.200", "name": "latency_ok"},
+                            {"expression": "rmq:latency > 5", "name": "latency_fail"},
+                            {"expression": "rmq:latency > 10 or (rules:latency_fail and
+                                rules:latency_fail:since > \"25s\")", "name": "panic"},
+                            {"expression": "rules:latency_ok and rules:latency_ok:since > \"30s\"",
+                                "name": "stable_latency"}
+                        ],
+                        "scale_down": "rules:stable_latency and rmq:consumers > 0",
+                        "scale_up": "rules:panic or (rmq:consumers == 0 and rmq:waiting > 0)  or not rmq:exists",
+                        "resources": [{"monitorer": "monitorer_rabbitmq", "identifier": "rpc-producer", "name": "rmq"}]
+                    }
+                },
+                "name": "producer",
+                "latest_ruleset": {
+                    "date": ISODate("2018-05-03T14:19:19.596Z"),
+                    "rule": {
+                        "latency_ok": true,
+                        "latency_fail": false,
+                        "panic": false,
+                        "stable_latency": true, "__scale_up__": false,
+                        "__scale_down__": true
+                    }
+                }
+            }
+
+        :param service_name:
+        :return:
+        """
         return self.mongo.services.find_one({'name': service_name})
+
 
     def _get_services(self):
         return self.mongo.services.find()

@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import copy
-import datetime
 import logging
 import pprint
 from functools import partial
@@ -8,7 +7,6 @@ from functools import partial
 from nameko.events import SERVICE_POOL, EventDispatcher, event_handler
 from nameko.exceptions import UnknownService
 from nameko.rpc import RpcProxy, rpc
-from nameko.timer import timer
 from promise.promise import Promise
 
 from common.db.mongo import Mongo
@@ -16,6 +14,10 @@ from common.entrypoint import once
 from common.utils import ImageVersion, filter_dict, log_all, make_promise
 
 logger = logging.getLogger(__name__)
+
+
+class NotMonitoredServiceException(Exception):
+    pass
 
 
 class Overseer(object):
@@ -243,7 +245,7 @@ class Overseer(object):
         return [filter_dict(d) for d in s]
 
     @rpc
-    @log_all
+    @log_all(NotMonitoredServiceException)
     def scale(self, service_name, scale):
         """
         scale the given service by his name to the given amount of instances.
@@ -253,39 +255,10 @@ class Overseer(object):
         """
         logger.debug("scaling service %s to %s", service_name, scale)
         service = self.get_service(service_name)
-        self._update_service(service, scale=scale)
-
-
-    @rpc
-    @log_all
-    def reload_from_scaler(self, service_name):
-        """
-        reload all available metric/config from the scaler for a given service.
-        :param service_name: the service's name
-        :return: the new service config
-        """
-        service = self._get_service(service_name)
-        logger.debug("rechargement depuis le scaler: %s", service_name)
+        logger.debug("scaling service: %s", service)
         if service is None:
-            raise UnknownService(service_name)
-        # update scaler config
-        scaler = self._get_scaler(service)
-        current_image_version = ImageVersion.deserialize(service['image']['image_info'])
-
-        update_scale_config = make_promise(
-            scaler.fetch_image_config.call_async(current_image_version.unique_image_id)
-        ).then(
-            partial(self.__update_scale_config, service=service)
-        )
-
-        update_service = make_promise(
-            scaler.get.call_async(service_name)
-        ).then(
-            partial(self._save_service_state, scaler=scaler, service=service)
-        )
-        Promise.all([update_scale_config, update_service]).get()
-
-        return filter_dict(service)
+            raise NotMonitoredServiceException("service %s is not monitored by overseer" % service_name)
+        self._update_service(service, scale=scale)
 
     # #######################################################
     #                    PRIVATE FUNCTIONS
@@ -329,12 +302,10 @@ class Overseer(object):
         :param kwargs:
         :rtype: Promise
         """
-        promise = make_promise(self._get_scaler(service).update.call_async(
+        self._get_scaler(service).update.call_async(
             service_name=service['name'],
             **kwargs
-        ))
-
-        return promise.then(lambda osef: self.reload_from_scaler(service_name=service['name']))
+        )
 
     # ###################################################################
     #                       common method
@@ -386,17 +357,3 @@ class Overseer(object):
         if img_version_serialized != service['image']['image_info']:
             changes['image'] = {'from': service['image']['image_info'], 'to': img_version_serialized}
         return changes
-
-    def __update_scale_config(self, new_scale_config, service):
-        scale_config = service.get('scale_config') or {}
-        logger.debug("get scaler %s fetch config for %s", service['image']['type'], service['image']['full_image_id'])
-        new_scale_config = new_scale_config or self._get_scaler(service['image']['type']).fetch_image_config(
-            service['image']['full_image_id'])
-        logger.debug("old new %s \n\n========\n%s", scale_config, new_scale_config)
-
-        if scale_config != new_scale_config:
-            # the scale config has been updated
-            service['scale_config'] = new_scale_config
-            self.mongo.services.update_one({'_id': service['_id']}, {'$set': {"scale_config": new_scale_config}})
-            self._set_trigger_rules(service)
-            logger.debug("updated scale config for %s" % service['name'])
