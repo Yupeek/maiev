@@ -3,7 +3,6 @@
     {
       "name": "{dirname}",
       "extends": "docker",
-      "type": "test",
       "context": {
         "extra_env": ["-e", "NAMEKO_MAX_WORKERS=1"]
       },
