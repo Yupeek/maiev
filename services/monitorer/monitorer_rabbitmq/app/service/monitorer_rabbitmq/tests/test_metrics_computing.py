@@ -76,6 +76,7 @@ def monitorer(rmq_result):
     m.rabbitmq = mock.Mock()
     m.dispatch = mock.Mock()
     m.rabbitmq.get_queue_stats.side_effect = lambda qname, columns: rmq_result.get(qname)
+    m.mongo = mock.Mock()
 
     return m
 
@@ -107,9 +108,8 @@ class TestMonitorQueue(object):
         assert monitorer._compute_queue(queue) == result
 
     def test_rpc_track(self, monitorer: MonitorerRabbitmq):
-        assert 'load_passed' not in monitorer.services_to_track
         monitorer.track('load_passed')
-        assert 'load_passed' in monitorer.services_to_track
+        monitorer.mongo.service_to_track.replace_one.assert_called()
 
     def test_rpc_get_queue_stats(self, monitorer: MonitorerRabbitmq):
         assert monitorer.get_queue_stats("not_launched") is None
@@ -122,10 +122,14 @@ class TestMonitorQueue(object):
         }
 
     def test_timer_time_tick(self, monitorer: MonitorerRabbitmq):
-        assert monitorer.dispatch.call_count == 0
-        monitorer.track('launched_idle')
-        assert monitorer.dispatch.call_count == 0
-        monitorer.track('not_launched')
+        l_iter = iter([{"name": "launched_idle", "last_check": None}, {"name": "not_launched", "last_check": None}])
+
+        def se(**kwarg):
+            try:
+                return next(l_iter)
+            except StopIteration:
+                return None
+        monitorer.mongo.service_to_track.find_and_modify.side_effect = se
         assert monitorer.dispatch.call_count == 0
         monitorer.time_tick()
         assert monitorer.dispatch.call_count == 2
