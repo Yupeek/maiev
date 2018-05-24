@@ -1,17 +1,21 @@
 # -*- coding: utf-8 -*-
+import datetime
 import logging
 
 from nameko.events import EventDispatcher
 from nameko.rpc import rpc
 from nameko.timer import timer
 
+from common.base import BaseWorkerService
+from common.db.mongo import Mongo
+from common.entrypoint import once
 from common.utils import log_all
 from service.dependency.rabbitmq import RabbitMq
 
 logger = logging.getLogger(__name__)
 
 
-class MonitorerRabbitmq(object):
+class MonitorerRabbitmq(BaseWorkerService):
     """
     the monitorer that track rabbitmq stats to
     report performance issues
@@ -33,7 +37,11 @@ class MonitorerRabbitmq(object):
     """
     :type: service.dependency.rabbitmq.RabbitMqApi
     """
-    services_to_track = {'rpc-producer'}
+
+    mongo = Mongo(name)
+    """
+    :type: mongo.Mongo
+    """
 
     # ####################################################
     #                 EVENTS
@@ -54,7 +62,18 @@ class MonitorerRabbitmq(object):
         :return:
         """
         logger.debug("will track %s", queue_identifier)
-        self.services_to_track |= {queue_identifier}
+        self.mongo.service_to_track.replace_one(
+            {
+                "name": queue_identifier
+             }, {
+                "name": queue_identifier,
+                "last_check": None,
+
+            }, upsert=True)
+
+    @once
+    def cleanup(self):
+        self.mongo.service_to_track.delete_many({"name": None})
 
     @rpc
     @log_all
@@ -73,8 +92,22 @@ class MonitorerRabbitmq(object):
     @timer(interval=5)
     @log_all
     def time_tick(self):
+        since = datetime.datetime.now() - datetime.timedelta(0, 4)
+        while True:
+            d = self.mongo.service_to_track.find_and_modify(**{
+                "query": {
+                    "$or": [
+                        {"last_check": None},
+                        {"last_check": {"$lt": since}}
+                    ]
+                },
+                "update": {"$set": {"last_check": datetime.datetime.now()}},
+                "remove": False,
+            })
+            if d is None:
+                break
+            queue_name = d['name']
 
-        for queue_name in self.services_to_track:
             metrics = self._compute_queue(queue_name)
             if metrics is not None:
                 self.dispatch("metrics_updated", {

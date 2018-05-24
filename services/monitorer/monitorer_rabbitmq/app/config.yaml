@@ -1,6 +1,7 @@
 AMQP_URI: amqp://${RABBITMQ_USER:guest}:${RABBITMQ_PASSWORD:guest}@${RABBITMQ_HOST:localhost}${RABBITMQ_VHOST:/}
 WEB_SERVER_ADDRESS: '0.0.0.0:8000'
 MONITORED_SERVER_URL: ${MONITORED_SERVER_URL}
+MONGO_URIS: ${MONGO_URIS:maiev_mongodb}
 
 serializer: json_datecompatible
 
