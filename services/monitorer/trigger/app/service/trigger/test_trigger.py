@@ -456,6 +456,7 @@ class TestConputeResults(TriggerTestcase):
 
 class WithDbTestTrigger(TriggerTestcase):
     dbname = "test_maiev_%d" % random.randint(0, 65535)
+
     @classmethod
     def setUpClass(cls):
         cls.mongo_cnx = MongoClient(os.environ.get('MONGO_TEST_URI', "localhost"))

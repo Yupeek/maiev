@@ -176,7 +176,6 @@ class LoadManager(BaseWorkerService):
         """
         return self.mongo.services.find_one({'name': service_name})
 
-
     def _get_services(self):
         return self.mongo.services.find()
 

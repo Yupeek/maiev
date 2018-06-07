@@ -6,14 +6,14 @@ from collections import namedtuple
 from pprint import pprint
 
 import pymongo
-from nameko.events import SERVICE_POOL, event_handler, EventDispatcher
-from nameko.rpc import rpc, RpcProxy
+from nameko.events import SERVICE_POOL, EventDispatcher, event_handler
+from nameko.rpc import RpcProxy, rpc
 from semantic_version import Version
 
 from common.base import BaseWorkerService
 from common.db.mongo import Mongo
 from common.entrypoint import once
-from common.utils import log_all, filter_dict, ImageVersion
+from common.utils import ImageVersion, filter_dict, log_all
 
 logger = logging.getLogger(__name__)
 
@@ -118,20 +118,20 @@ class UpgradePlaner(BaseWorkerService):
     mongo = Mongo(name)
     """
     :type: pymongo.MongoClient
-    
-    collections: 
+
+    collections:
     ***********
-    
+
     catalog
     #######
-    
+
     list all managed service for auto upgrade
-    
+
     name: producer
     version: 1.0.16
     service: # same struct as overseer
       name: producer
-      image: 
+      image:
         type: docker
         image_info:
           repository: localhost:5000
@@ -141,7 +141,7 @@ class UpgradePlaner(BaseWorkerService):
           version: 1.0.16
           digest: sha256:581647ffd59fc7dc9b2f164fe299de29bf99fb1cb304c41ea07d8fa3f95f052b
         full_image_id: localhost:5000/maiev:producer
-      scale_config: 
+      scale_config:
       mode:
         name: replicated
         replicas: 23
@@ -152,31 +152,30 @@ class UpgradePlaner(BaseWorkerService):
           require: [...]
           provide: {...}
 
-
     history
     #######
-    
-    list all history of phases of services. 
-    
+
+    list all history of phases of services.
+
     services:
         $name: version
     date: $now
-    
-    
+
+
     scheduling
     ##########
-    
+
     store all scheduled upgrades available.
-    
+
     state: (running, aborded, done, waiting)
     steps:
-      - service: $servicename 
+      - service: $servicename
         from: $version_from
         to: $version_to
         state: (running, aborded, done, waiting)
-    
-    
-    
+
+
+
     """
 
     dispatch = EventDispatcher()
@@ -511,7 +510,7 @@ class UpgradePlaner(BaseWorkerService):
         phases = [Phase.deserialize(phase) for phase in solved_phases['results']]
         goal, note = self.solve_best_phase(phases)  # type: Phase[PhasePin], int
         """
-        goal is the best noted phase given by all compatible phases. 
+        goal is the best noted phase given by all compatible phases.
         """
         if goal is None:
             return {

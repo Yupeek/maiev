@@ -54,14 +54,14 @@ class Overseer(object):
     mongo = Mongo(name)
     """
     :type: mongo.MongoClient
-    
-    collections: 
+
+    collections
     ***********
-    
+
     services
     ########
     list of all services managed by overseer::
-        
+
         name: producer
         image:
           type: docker
@@ -73,27 +73,26 @@ class Overseer(object):
             version: 1.0.16
             digest: sha256:581647ffd59fc7dc9b2f164fe299de29bf99fb1cb304c41ea07d8fa3f95f052b
           full_image_id: localhost:5000/maiev:producer
-        scale_config:  # content of scale_info 
-         
+        scale_config:  # content of scale_info
+
         mode:
           name: replicated
           replicas: 23
 
-            
     """
 
     dispatch = EventDispatcher()
     """
     events
     ******
-    
+
     service_updated
     ###############
-    
+
     dispatched each time a service is updated. either his image or his replicas count.
-    
+
     payload: content of the service and the computed diff between old and new states.::
-    
+
         service:
           name: producer
           image:
@@ -106,7 +105,7 @@ class Overseer(object):
               version: 1.0.16
               digest: sha256:581647ffd59fc7dc9b2f164fe299de29bf99fb1cb304c41ea07d8fa3f95f052b
             full_image_id: localhost:5000/maiev:producer
-          scale_config:  # content of scale_info 
+          scale_config:  # content of scale_info
           mode:
             name: replicated
             replicas: 23
@@ -123,11 +122,7 @@ class Overseer(object):
           scale: # facultatif
             from: 2
             to: 3
-          
-    
-    
-    
-    
+
     """
 
     type_to_scaler = {

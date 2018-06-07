@@ -62,14 +62,14 @@ class MonitorerRabbitmq(BaseWorkerService):
         :return:
         """
         logger.debug("will track %s", queue_identifier)
-        self.mongo.service_to_track.replace_one(
-            {
-                "name": queue_identifier
-             }, {
-                "name": queue_identifier,
-                "last_check": None,
-
-            }, upsert=True)
+        self.mongo.service_to_track.replace_one({
+            "name": queue_identifier
+        }, {
+            "name": queue_identifier,
+            "last_check": None,
+        },
+            upsert=True
+        )
 
     @once
     def cleanup(self):

@@ -149,12 +149,12 @@ def service():
 class TestServiceUpdatePropagation(object):
 
     def test_diff_compute_no_diff(self, overseer: Overseer, service_data, service):
-        d = overseer._compute_diff(service_data, service)
+        d = overseer._compute_diff(service_data, service, {})
         assert d == {}
 
     def test_diff_with_image(self, overseer: Overseer, service_data, service):
         service_data['tag'] = 'producer-1.0.18'
-        d = overseer._compute_diff(service_data, service)
+        d = overseer._compute_diff(service_data, service, {})
         assert {'image'} == set(d)
         assert d['image'] == {
             'from':
@@ -174,15 +174,30 @@ class TestServiceUpdatePropagation(object):
 
     def test_diff_with_scale(self, overseer: Overseer, service_data, service):
         service_data['mode']['replicas'] = 10
-        d = overseer._compute_diff(service_data, service)
+        d = overseer._compute_diff(service_data, service, {})
         assert {'scale'} == set(d)
         assert d['scale'] == {'from': 0, 'to': 10}
 
     def test_diff_with_mode(self, overseer: Overseer, service_data, service):
         service_data['mode']['name'] = 'global'
-        d = overseer._compute_diff(service_data, service)
+        d = overseer._compute_diff(service_data, service, {})
         assert {'mode'} == set(d)
         assert d['mode'] == {'from': {'name': 'replicated', 'replicas': 0}, 'to': {'name': 'global', 'replicas': 0}}
+
+    def test_diff_with_new_status_attrs_no_old(self, overseer: Overseer, service_data, service):
+        d = overseer._compute_diff(service_data, service, {
+            "updatestate.new": 'completed'
+        })
+        assert {'state'} == set(d)
+        assert d['state'] == {'from': None, 'to': 'completed'}
+
+    def test_diff_with_new_status_attrs(self, overseer: Overseer, service_data, service):
+        d = overseer._compute_diff(service_data, service, {
+            "updatestate.new": 'completed',
+            "updatestate.old": 'upgrading'
+        })
+        assert {'state'} == set(d)
+        assert d['state'] == {'from': 'upgrading', 'to': 'completed'}
 
 
 class TestOverseerServiceEvent(object):
@@ -204,13 +219,13 @@ class TestOverseerServiceEvent(object):
 
     def test_event_service_updated_no_diff(self, overseer: Overseer, service_data, service):
         overseer.mongo.services.find_one.return_value = service
-        overseer.on_service_updated({'service': service_data})
+        overseer.on_service_updated({'service': service_data, 'attributes': {}})
         overseer.dispatch.assert_not_called()
 
     def test_event_service_updated_with_diff(self, overseer: Overseer, service_data, service):
         overseer.mongo.services.find_one.return_value = service
         service_data['tag'] = 'producer-1.0.18'
-        overseer.on_service_updated({'service': service_data})
+        overseer.on_service_updated({'service': service_data, 'attributes': {}})
         overseer.dispatch.assert_called_once_with('service_updated', {
             'service': filter_dict(service),
             'diff': self.DIFF_IMAGE})

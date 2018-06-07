@@ -213,6 +213,3 @@ class TestExplain(object):
 
         result = list(s.solve())
         assert len(result) == 1
-
-
-
