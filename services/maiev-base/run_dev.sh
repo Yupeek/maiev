@@ -44,6 +44,12 @@ asyncRun() {
 CLASS_NAME=$(python -c "import service.${SERVICE_NAME}.${SERVICE_NAME} as m; print([n for n in dir(m) if getattr(getattr(m, n), 'name', '').endswith('${SERVICE_NAME}')][0])")
 
 echo "running ${GREEN}service.${SERVICE_NAME}.${SERVICE_NAME}.${CLASS_NAME}${RESTORE}"
-asyncRun node /app_dev/node_modules/.bin/concurrently --kill-others-on-fail --color -c "black.bgWhite,cyan,red"   \
+
+if [ -f webpack.config.js ];
+then
+    asyncRun node /app_dev/node_modules/.bin/concurrently --kill-others-on-fail --color -c "black.bgWhite,cyan,red"   \
 		"test ! -f webpack.config.js || ./node_modules/.bin/webpack --watch" \
 	 	"/app_dev/node_modules/.bin/supervisor -w . -e py -n exit -x nameko -- run --config config.yaml service.${SERVICE_NAME}.${SERVICE_NAME}:${CLASS_NAME}"
+else
+    asyncRun /app_dev/node_modules/.bin/supervisor -w . -e py -n exit -x nameko -- run --config config.yaml "service.${SERVICE_NAME}.${SERVICE_NAME}:${CLASS_NAME}"
+fi

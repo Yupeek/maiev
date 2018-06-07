@@ -1,0 +1,14 @@
+{
+  "services": [
+    {
+      "name": "{dirname}",
+      "extends": "docker",
+      "require": [
+        "super()",
+        "mongodb",
+        "dependency_solver",
+        "overseer"
+      ]
+    }
+  ]
+}

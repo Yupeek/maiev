@@ -182,9 +182,10 @@ class ImageVersion(object):
             'version': None,
             'digest': hints.get('digest')
         }
-        parsed_raw = cls.tag_regex.match(tag)
-        if parsed_raw:
-            result.update(parsed_raw.groupdict())
+        if tag is not None:
+            parsed_raw = cls.tag_regex.match(tag)
+            if parsed_raw:
+                result.update(parsed_raw.groupdict())
         return result
 
     def is_same_image(self, other):

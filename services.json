@@ -8,6 +8,7 @@
         "--rm",
         "--name={name}",
         "--network={networkname}",
+        "{volume}",
         "{port}",
         "{image_name}"
       ],
@@ -15,7 +16,8 @@
       "context": {
         "name": "{service_name}_{engine_name}",
         "image_name": "health_{engine_name}:dev",
-        "port": ""
+        "port": "",
+        "volume": ""
       },
       "abstract": true,
       "waitUntil": 5000,
@@ -27,6 +29,7 @@
       "retry": 2,
       "waitUntilStr": "waiting for connections on port ",
       "context": {
+        "volume": ["-v", "db-mongo:/data/db"],
         "engine_name": "mongodb",
         "port": ["-p", "27017:27017"]
       }

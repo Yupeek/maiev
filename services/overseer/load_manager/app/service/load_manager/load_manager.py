@@ -118,7 +118,7 @@ class LoadManager(BaseWorkerService):
         """
         monitor the given service.
 
-        :param service: the service with his name and his scaler_config
+        :param service: the service with his name and his scale_config
         :return:
         """
         self.mongo.services.update(

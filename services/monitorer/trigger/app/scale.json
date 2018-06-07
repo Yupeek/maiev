@@ -1,7 +1,7 @@
 {
   "min": 1,
   "max": 1,
-  "dependences": {
+  "dependencies": {
     "require": [
       "\"metrics.exists\" in monitorer_rabbitmq:event:metrics_updated:params",
       "monitorer_rabbitmq:rpc:track >= 1"

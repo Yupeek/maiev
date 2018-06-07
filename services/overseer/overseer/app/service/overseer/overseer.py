@@ -43,7 +43,6 @@ class Overseer(object):
 
     """
     name = 'overseer'
-    dispatch = EventDispatcher()
     scaler_docker = RpcProxy("scaler_docker")
     """
     :type: service.scaler_docker.scaler_docker.ScalerDocker
@@ -54,7 +53,81 @@ class Overseer(object):
     """
     mongo = Mongo(name)
     """
-    :type: mongo.Mongo
+    :type: mongo.MongoClient
+    
+    collections: 
+    ***********
+    
+    services
+    ########
+    list of all services managed by overseer::
+        
+        name: producer
+        image:
+          type: docker
+          image_info: # ImageVersion.serialize
+            repository: localhost:5000
+            image: maiev
+            tag: producer-1.0.16
+            species: producer
+            version: 1.0.16
+            digest: sha256:581647ffd59fc7dc9b2f164fe299de29bf99fb1cb304c41ea07d8fa3f95f052b
+          full_image_id: localhost:5000/maiev:producer
+        scale_config:  # content of scale_info 
+         
+        mode:
+          name: replicated
+          replicas: 23
+
+            
+    """
+
+    dispatch = EventDispatcher()
+    """
+    events
+    ******
+    
+    service_updated
+    ###############
+    
+    dispatched each time a service is updated. either his image or his replicas count.
+    
+    payload: content of the service and the computed diff between old and new states.::
+    
+        service:
+          name: producer
+          image:
+            type: docker
+            image_info: # ImageVersion.serializ
+              repository: localhost:5000
+              image: maiev
+              tag: producer-1.0.16
+              species: producer
+              version: 1.0.16
+              digest: sha256:581647ffd59fc7dc9b2f164fe299de29bf99fb1cb304c41ea07d8fa3f95f052b
+            full_image_id: localhost:5000/maiev:producer
+          scale_config:  # content of scale_info 
+          mode:
+            name: replicated
+            replicas: 23
+        diff:
+          image: # facultatif
+            from: #image_info
+            to: #image_info
+          replicas: # facultatif
+            from:
+              name: replicated
+              replicas: 2
+            to:
+              name: global
+          scale: # facultatif
+            from: 2
+            to: 3
+          
+    
+    
+    
+    
     """
 
     type_to_scaler = {
@@ -71,6 +144,11 @@ class Overseer(object):
     )
     @log_all
     def on_service_updated(self, payload):
+        """
+        update the state of the updated service and dispatch service_ùpdated
+        :param payload:
+        :return:
+        """
         logger.debug("notified service updated with %s", payload)
         service_data = payload['service']
         service = self._get_service(service_data['name'])
@@ -84,7 +162,7 @@ class Overseer(object):
         "overseer", "service_updated", handler_type=SERVICE_POOL, reliable_delivery=True
     )
     @log_all
-    def check_new_scaler_config(self, payload):
+    def check_new_scale_config(self, payload):
         """
         check if the image is changed, this mean a new scaler-config is changed too ?
         :param dict payload: the payload sent by self.on_service_updated
@@ -130,16 +208,17 @@ class Overseer(object):
         if set(payload) < {'repository', 'image', 'tag', 'digest'}:
             return  # update can be called with blob update instead of images
 
-        new_image_version = ImageVersion.from_scaler(payload)
-        logger.debug("version found for this push : %s", new_image_version)
+        image_version = ImageVersion.from_scaler(payload)
+        logger.debug("version found for this push : %s. searching for %s", image_version, image_version.image_id)
 
-        for service in self._get_services(scaler_type=scaler_type, full_image_id=new_image_version.image_id):
-            current_image_version = ImageVersion.deserialize(service['image']['image_info'])
-            logger.debug("current image: %s new one : %s", current_image_version, new_image_version)
-            if current_image_version == new_image_version:
-                continue
-
-            # TODO: change behavior and use dependency
+        for service in self._get_services(scaler_type=scaler_type, full_image_id=image_version.image_id):
+            scale_config = self.scaler_docker.fetch_image_config(image_version.unique_image_id)
+            logger.debug("will dispatch new event for service %s", service['name'])
+            self.dispatch("new_image", {
+                "service": filter_dict(service),
+                "image": image_version.serialize(),
+                "scale_config": scale_config
+            })
 
     # ####################################################
     #                 ONCE
@@ -154,7 +233,7 @@ class Overseer(object):
                 for service in result:
                     if 'rabbitmq' not in service['name']:
                         self.monitor(scaler.type, service['name'])
-        logger.debug("services: %s", pprint.pformat(list(self.mongo.services.find()), indent=2, width=119))
+            logger.debug("services: %s", pprint.pformat(list(self.mongo.services.find()), indent=2, width=119))
 
     # ####################################################
     #                 RPC
@@ -198,7 +277,6 @@ class Overseer(object):
                 "env": service_data.get('env', {}),
                 "secret": [],
             },
-            "latest_ruleset": {},
             "mode": service_data['mode']
         }
         self.mongo.services.update(
@@ -206,6 +284,7 @@ class Overseer(object):
             result,
             upsert=True,
         )
+        self.dispatch('service_updated', {"service": filter_dict(result), "diff": {}})
 
     @rpc
     def list_service(self):
@@ -259,6 +338,16 @@ class Overseer(object):
         if service is None:
             raise NotMonitoredServiceException("service %s is not monitored by overseer" % service_name)
         self._update_service(service, scale=scale)
+
+    @rpc
+    @log_all
+    def upgrade_service(self, service_name, image_id):
+        if isinstance(image_id, dict):
+            image_id = ImageVersion.deserialize(image_id).unique_image_id
+        service = self.get_service(service_name)
+        if service is None:
+            raise NotMonitoredServiceException("service %s is not monitored by overseer" % service_name)
+        self._update_service(service, image_id=image_id)
 
     # #######################################################
     #                    PRIVATE FUNCTIONS

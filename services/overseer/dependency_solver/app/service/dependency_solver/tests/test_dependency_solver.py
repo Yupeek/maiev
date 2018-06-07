@@ -188,3 +188,31 @@ class TestSolver:
                 for service, version in solution
             )
             assert expected == res
+
+
+class TestExplain(object):
+
+    def test_explain_1(self):
+        catalog = [{'name': 'producer', 'versions': {'1.0.16': {'provide': {}, 'require': []}}},
+                   {'name': 'consumer',
+                    'versions': {'1.0.3': {'provide': {},
+                                           'require': ['producer:rpc:echo', '"*args" in producer:rpc:echo:args']}}},
+                   {'name': 'portainer', 'versions': {'latest': {'provide': {}, 'require': []}}}]
+        s = Solver(catalog, tuple(), debug=True)
+
+        result = list(s.solve())
+        assert len(result) == 0
+
+    def test_explain_uniqu(self):
+        catalog = [{'name': 'producer', 'versions': {'1.0.16': {'provide': {}, 'require': []}}},
+                   {'name': 'consumer',
+                    'versions': {'1.0.3': {'provide': {},
+                                           'require': []}}},
+                   {'name': 'portainer', 'versions': {'latest': {'provide': {}, 'require': []}}}]
+        s = Solver(catalog, tuple(), debug=True)
+
+        result = list(s.solve())
+        assert len(result) == 1
+
+
+

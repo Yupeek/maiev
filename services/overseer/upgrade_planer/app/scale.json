@@ -5,9 +5,7 @@
     "require": [
     ],
     "provide": {
-      "dependency_solver:rpc:solve_dependencies": 1,
-      "dependency_solver:rpc:solve_dependencies:args": ["catalog", "extra_constraints"],
-      "dependency_solver:rpc:solve_dependencies:rtype": ["list"]
+
     },
     "optional": [
     ]
@@ -15,13 +13,20 @@
   "metric": [
   ],
   "envs": [
+    {
+      "name": "My_ENV",
+      "type": "string",
+      "required": true,
+      "default": "this is default",
+      "description": "some env"
+    }
   ],
   "scale": {
     "resources": [
       {
         "name": "rmq",
         "monitorer": "monitorer_rabbitmq",
-        "identifier": "rpc-overseer_dependency_solver"
+        "identifier": "rpc-overseer_upgrade_planer"
       }
     ],
     "rules": [

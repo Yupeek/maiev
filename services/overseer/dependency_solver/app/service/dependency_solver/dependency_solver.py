@@ -81,9 +81,13 @@ def complete_with_objects(root_table):
 
 class Solver(object):
 
-    def __init__(self, catalog, extra_constraints):
+    def __init__(self, catalog, extra_constraints, debug=False):
         self.catalog = catalog
         self.extra_constraints = extra_constraints
+        self.anomalies = []
+        self.debug = debug
+        self.failed = []
+        self.extra_constraints_compiled = []
 
     def compile_resolution(self):
         pass
@@ -126,13 +130,29 @@ class Solver(object):
             res[service['name']] = {}
 
             for number, version in service['versions'].items():
+                require = None
+                try:
+                    compiled = []
+                    for require in version['require']:  # type: str
 
-                res[service['name']][number] = compiled = []
-                for require in version['require']:  # type: str
-                    compiled.append(parse_manager.parse(require))
-        self.extra_constraints_compiled = [
-            parse_manager.parse(constr) for constr in self.extra_constraints
-        ]
+                        parsed = parse_manager.parse(require)
+                        parsed.original_string = require
+                        compiled.append(parsed)
+                    res[service['name']][number] = compiled
+                except ScopeError as e:
+                    self.anomalies.append({
+                        "expression": require,
+                        "service": service['name'],
+                        "version": number,
+                        "error": str(e)
+                    })
+
+        self.extra_constraints_compiled = []
+        for constr in self.extra_constraints:
+            parsed = parse_manager.parse(constr)
+            parsed.original_string = constr
+            self.extra_constraints_compiled.append(parsed)
+
         return res
 
     def solve(self):
@@ -151,6 +171,7 @@ class Solver(object):
                         "require": conditions[service['name']][number]
                     }
                     for number, version in service["versions"].items()
+                    if number in conditions.get(service['name'], {})
                 })
             )
 
@@ -166,9 +187,16 @@ class Solver(object):
         """
         provided = self.build_provided(tmpsolution)
         try:
-            return all(require(provided) for require in version['require'])
+
+            for require in version['require']:
+                if not require(provided):
+                    if self.debug:
+                        self.failed.append((require.original_string, provided))
+                    return False
         except (ScopeError, KeyError) as e:
             return False
+        else:
+            return True
 
     def check_extra_constraints(self, service, version, tmpsolution):
         """
@@ -180,9 +208,15 @@ class Solver(object):
         """
         provided = self.build_provided(tmpsolution)
         try:
-            return all(require(provided) for require in self.extra_constraints_compiled)
+            for require in self.extra_constraints_compiled:
+                if not require(provided):
+                    if self.debug:
+                        self.failed.append((require.original_string, provided))
+                    return False
         except (ScopeError, KeyError) as e:
             return False
+        else:
+            return True
 
     def build_provided(self, solution):
         res = {}
@@ -195,8 +229,8 @@ class Solver(object):
     def backtrack(self, remaining_services, constraints, tmp_solution):
         if len(remaining_services) == 0:
             yield tmp_solution
-
-        for remaining_service, versions in remaining_services:
+        else:
+            remaining_service, versions = remaining_services[0]
             for version_num, version in sorted(versions.items(), reverse=True):
                 for c in constraints:
                     if not c(remaining_service, version, tmp_solution):
@@ -221,21 +255,20 @@ class DependencySolver(BaseWorkerService):
     hello(name: string): string
 
     """
-    name = 'overseer_dependency_solver'
+    name = 'dependency_solver'
 
     @rpc
     @log_all
     def solve_dependencies(self, catalog, extra_constraints=tuple()):
         """
-        build all possibles revision for the given catalog respecting given constraints.
+        build all possibles phases for the given catalog respecting given constraints.
 
         :param list catalog: the catalog of micro-service, including there version, and for each the requirements and
                 what they provides::
 
-                    catalog:
-                        service:
-                            name: "myservice"
-                            versions:
+                    -   name: "myservice"
+                        versions:
+                            $version:
                                 provide: {"rpc:holle": 1, "rpc:hello:args": ["name"]}
                                 require: ["myservice:rpc:hello", "myservice:rpc:hello>1",
                                           "'name' in myservice:rpc:hello:args"]
@@ -243,5 +276,50 @@ class DependencySolver(BaseWorkerService):
         :param list extra_constraints: list of extra constraints if required (same form as service's require)
         :return: all possibles versions folowing the given constraints
         """
-        s = Solver(catalog, extra_constraints)
-        return list(s.solve())
+        try:
+            s = Solver(catalog, extra_constraints)
+            return {
+                "results": list(s.solve()),
+                "errors": [],
+                "anomalies": s.anomalies
+            }
+        except ScopeError as e:
+            logger.exception("scope error")
+            return {
+                "results": [],
+                "errors": [
+                    {"type": "missing scope",
+                     "str": str(e)
+                     }
+                ]
+            }
+
+    @rpc
+    @log_all
+    def explain(self, catalog, extra_constraints=tuple()):
+        """
+        try only one possiblitiy and return if it's a valid phase or not.
+        if it's not valid, return the failed requirements.
+        :param catalog:
+        :return:
+        """
+        s = Solver(catalog, extra_constraints, debug=True)
+        try:
+            return {
+                "results": list(s.solve()),
+                "errors": [],
+                "anomalies": s.anomalies,
+                "failed": s.failed
+            }
+        except ScopeError as e:
+            logger.exception("scope error")
+            return {
+                "results": [],
+                "anomalies": s.anomalies,
+                "failed": s.failed,
+                "errors": [
+                    {"type": "missing scope",
+                     "str": str(e)
+                     }
+                ]
+            }

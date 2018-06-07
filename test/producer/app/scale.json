@@ -1,11 +1,21 @@
 {
   "min": 0,
   "max": 9,
-  "dependences": {
-    "required": [
+  "dependencies": {
+    "require": [
     ],
-    "optional": [
-    ]
+    "provide": {
+      "producer:rpc:get": 1,
+      "producer:rpc:get:args": [],
+      "producer:rpc:get:rtype": ["int"],
+      "producer:rpc:echo": 1,
+      "producer:rpc:echo:args": ["*args", "**kwargs"],
+      "producer:rpc:echo:rtype": ["args", "kwargs"],
+      "producer:rpc:raises": 1,
+      "producer:rpc:raises:args": ["message"],
+      "producer:rpc:raises:rtype": []
+    }
+
   },
   "scale": {
     "resources": [

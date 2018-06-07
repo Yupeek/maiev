@@ -120,7 +120,7 @@ def service():
         'latest_ruleset': {},
         'mode': {'name': 'replicated', 'replicas': 0},
         'name': 'producer',
-        'scale_config': {'dependences': {'optional': [], 'required': []},
+        'scale_config': {'dependencies': {'optional': [], 'required': []},
                          'max': 9,
                          'min': 0,
                          'scale': {'resources': [{'identifier': 'rpc-producer',
@@ -216,12 +216,12 @@ class TestOverseerServiceEvent(object):
             'diff': self.DIFF_IMAGE})
 
     def test_event_service_updated_scale(self, overseer: Overseer, service):
-        overseer.check_new_scaler_config({'diff': {'scale': {'from': 0, 'to': 10}}, 'service': filter_dict(service)})
+        overseer.check_new_scale_config({'diff': {'scale': {'from': 0, 'to': 10}}, 'service': filter_dict(service)})
         overseer.mongo.services.update_one.assert_not_called()
         overseer.dispatch.assert_not_called()
 
     def test_event_service_updated_image_same_config(self, overseer: Overseer, service):
-        overseer.check_new_scaler_config({'diff': self.DIFF_IMAGE, 'service': filter_dict(service)})
+        overseer.check_new_scale_config({'diff': self.DIFF_IMAGE, 'service': filter_dict(service)})
         overseer.mongo.services.update_one.assert_not_called()
         overseer.dispatch.assert_not_called()
 
@@ -229,6 +229,6 @@ class TestOverseerServiceEvent(object):
         scale_config = copy.deepcopy(service['scale_config'])
         scale_config['max'] = 4
         overseer.scaler_docker.fetch_image_config.return_value = scale_config
-        overseer.check_new_scaler_config({'diff': self.DIFF_IMAGE, 'service': filter_dict(service)})
+        overseer.check_new_scale_config({'diff': self.DIFF_IMAGE, 'service': filter_dict(service)})
         overseer.mongo.services.update_one.assert_called()
         overseer.dispatch.assert_called()
