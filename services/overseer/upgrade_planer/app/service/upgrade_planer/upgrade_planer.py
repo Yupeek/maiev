@@ -241,7 +241,11 @@ class UpgradePlaner(BaseWorkerService):
         :param payload:
         :return:
         """
-        assert {'service'} <= set(payload), "missing data in payload: %s" % str(set(payload))
+        assert {'service', 'diff'} <= set(payload), "missing data in payload: %s" % str(set(payload))
+
+        # we just handle finished changes
+        if payload['diff'].get('state', {}).get('to') != 'completed':
+            return
 
         service_name_ = payload['service']['name']
         service = self.mongo.catalog.find_one({'name': service_name_})
@@ -249,6 +253,9 @@ class UpgradePlaner(BaseWorkerService):
         if service:
             service['service'] = payload['service']
             from_version = service['version']
+            if from_version == version_:
+                # this is a false positive, since the current version is already the reported one...
+                return
             service['version'] = version_
         else:
             from_version = None
@@ -283,8 +290,6 @@ class UpgradePlaner(BaseWorkerService):
         })
 
         self.continue_scheduled_plan(service, from_version, version_)
-
-        # TODO: manage upgrade plan phase
 
     @event_handler(
         "overseer", "new_image", handler_type=SERVICE_POOL, reliable_delivery=True
@@ -351,9 +356,9 @@ class UpgradePlaner(BaseWorkerService):
 
     @rpc
     @log_all
-    def list_catalog(self, filter=None):
-        filter = filter or {}
-        return [filter_dict(res) for res in self.mongo.catalog.find(filter)]
+    def list_catalog(self, filter_=None):
+        filter_ = filter_ or {}
+        return [filter_dict(res) for res in self.mongo.catalog.find(filter_)]
 
     @rpc
     @log_all
@@ -504,7 +509,6 @@ class UpgradePlaner(BaseWorkerService):
                 }
             }
         phases = [Phase.deserialize(phase) for phase in solved_phases['results']]
-        logger.debug("solved %s", phases)
         goal, note = self.solve_best_phase(phases)  # type: Phase[PhasePin], int
         """
         goal is the best noted phase given by all compatible phases. 

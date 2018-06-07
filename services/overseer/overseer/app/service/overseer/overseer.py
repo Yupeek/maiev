@@ -151,8 +151,9 @@ class Overseer(object):
         """
         logger.debug("notified service updated with %s", payload)
         service_data = payload['service']
+        attributes = payload['attributes']
         service = self._get_service(service_data['name'])
-        diff = self._compute_diff(service_data, service)
+        diff = self._compute_diff(service_data, service, attributes)
         scaler = self._get_scaler(service)
         self._save_service_state(service_data, scaler, service)
         if diff:
@@ -422,7 +423,7 @@ class Overseer(object):
             }}
         )
 
-    def _compute_diff(self, service_data, service):
+    def _compute_diff(self, service_data, service, attributes):
         """
         return a dict with the diff between the old state and the new state of a service.
         currently check: scale, images, scale_config, env.
@@ -445,4 +446,6 @@ class Overseer(object):
         img_version_serialized = ImageVersion.from_scaler(service_data).serialize()
         if img_version_serialized != service['image']['image_info']:
             changes['image'] = {'from': service['image']['image_info'], 'to': img_version_serialized}
+        if 'updatestate.new' in attributes:
+            changes['state'] = {'from': attributes.get('updatestate.old'), 'to': attributes['updatestate.new']}
         return changes
