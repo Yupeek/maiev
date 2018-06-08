@@ -4,8 +4,8 @@ import logging
 import mock
 # other MS
 import pytest
-from services.overseer.upgrade_planer.app.service.upgrade_planer.upgrade_planer import (ACCEPT_ALL, NO_DOWNGRADE,
-                                                                                        Phase, PhasePin, UpgradePlaner)
+
+from service.upgrade_planer.upgrade_planer import ACCEPT_ALL, NO_DOWNGRADE, Phase, PhasePin, UpgradePlaner
 
 logger = logging.getLogger(__name__)
 
