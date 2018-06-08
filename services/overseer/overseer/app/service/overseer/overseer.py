@@ -2,6 +2,7 @@
 import copy
 import logging
 import pprint
+import time
 from functools import partial
 
 from nameko.events import SERVICE_POOL, EventDispatcher, event_handler
@@ -9,6 +10,7 @@ from nameko.exceptions import UnknownService
 from nameko.rpc import RpcProxy, rpc
 from promise.promise import Promise
 
+from common.base import BaseWorkerService
 from common.db.mongo import Mongo
 from common.entrypoint import once
 from common.utils import ImageVersion, filter_dict, log_all, make_promise
@@ -20,7 +22,7 @@ class NotMonitoredServiceException(Exception):
     pass
 
 
-class Overseer(object):
+class Overseer(BaseWorkerService):
     """
     the main orchestation service. manages upgrades of services and propagate events for new version etc.
 
@@ -50,6 +52,10 @@ class Overseer(object):
     trigger = RpcProxy('trigger')
     """
     :type: service.trigger.trigger.Trigger
+    """
+    load_manager = RpcProxy('overseer_load_manager')
+    """
+    :type: service.load_manager.load_manager.LoadManager
     """
     mongo = Mongo(name)
     """
@@ -146,7 +152,7 @@ class Overseer(object):
         """
         logger.debug("notified service updated with %s", payload)
         service_data = payload['service']
-        attributes = payload['attributes']
+        attributes = payload.get('attributes', {})
         service = self._get_service(service_data['name'])
         diff = self._compute_diff(service_data, service, attributes)
         scaler = self._get_scaler(service)
@@ -223,6 +229,7 @@ class Overseer(object):
     @once
     @log_all
     def fetch_services(self):
+        time.sleep(4)
         if not self.mongo.services.find_one():
             for scaler in self._get_scalers():
                 result = scaler.list_services()
@@ -280,6 +287,7 @@ class Overseer(object):
             result,
             upsert=True,
         )
+        self.load_manager.monitor_service(result)
         self.dispatch('service_updated', {"service": filter_dict(result), "diff": {}})
 
     @rpc

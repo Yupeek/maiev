@@ -1,0 +1,30 @@
+{
+  "services": [
+    {
+      "name": "{dirname}",
+      "extends": "docker",
+      "require": [
+        "super()",
+        "mongodb",
+        "registry_docker"
+
+      ],
+      "context": {
+        "run_dev": ["-v", "{root}/global/run_dev.sh:/run_dev.sh:ro"],
+        "extra_env": [
+          "-e", "MONITORED_SERVER_URL=http://guest:guest@192.168.253.141:15672/api/"
+        ],
+        "extra_volume": "-v=/var/run/docker.sock:/var/run/docker.sock",
+        "service_binding": [
+          "-v", "{root}/services/monitorer/monitorer_rabbitmq/app/service/monitorer_rabbitmq:/app/service/monitorer_rabbitmq",
+          "-v", "{root}/services/monitorer/trigger/app/service/trigger:/app/service/trigger",
+          "-v", "{root}/services/overseer/dependency_solver/app/service/dependency_solver:/app/service/dependency_solver",
+          "-v", "{root}/services/overseer/load_manager/app/service/load_manager:/app/service/load_manager",
+          "-v", "{root}/services/overseer/overseer/app/service/overseer:/app/service/overseer",
+          "-v", "{root}/services/overseer/upgrade_planer/app/service/upgrade_planer:/app/service/upgrade_planer",
+          "-v", "{root}/services/scaler/scaler_docker/app/service/scaler_docker:/app/service/scaler_docker"
+        ]
+      }
+    }
+  ]
+}

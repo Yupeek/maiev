@@ -1,6 +1,6 @@
 
 .DEFAULT_GOAL := all
-SUBDIRS := services
+SUBDIRS := services global
 .PHONY: clean $(SUBDIRS)
 NETWORK_NAME ?= maiev
 LOCAL_IP ?= $(shell ip a s | awk '/inet /{print $$2}' | grep -v 127.0.0.1 | head -n 1 |  cut -d/ -f 1)
@@ -39,6 +39,8 @@ install:  ## init current docker to swarm for test
 		--replicas 1 --network=$(NETWORK_NAME) $(DOCKER_REPO)/scaler_docker  && sleep 1
 	-docker service create --name registry_docker --publish 5000:5000 \
 		--replicas 1 --network=$(NETWORK_NAME) $(DOCKER_REPO)/registry_docker  && sleep 1
+
+
 
 dev:
 	TARGET=dev $(MAKE) build-image

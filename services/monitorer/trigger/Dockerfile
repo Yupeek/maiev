@@ -13,7 +13,7 @@ RUN test ! -f requirements.txt || pip3 install -r requirements.txt
 
 
 USER service
-CMD ["nameko", "run", "--config", "config.yaml", "service.trigger.trigger"]
+CMD ["nameko", "run", "--config", "config.yaml", "service.trigger.trigger:Trigger"]
 
 
 COPY ./app /app

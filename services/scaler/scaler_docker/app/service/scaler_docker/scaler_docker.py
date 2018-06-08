@@ -204,8 +204,6 @@ class ScalerDocker(object):
                 attrs['mode'] = ServiceMode('replicated', scale)
         service.update(fetch_current_spec=True, **attrs)
 
-        self.dispatch('service_updated', {'service': self.get(service_id=service.id)})
-
     @rpc
     @log_all(ValueError)
     def get(self, service_id=None, service_name=None):

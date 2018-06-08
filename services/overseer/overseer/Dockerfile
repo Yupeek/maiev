@@ -6,6 +6,6 @@ RUN if [ "$TARGET" = "dev" ]; then \
 
 
 USER service
-CMD ["nameko", "run", "--config", "config.yaml", "service.overseer.overseer"]
+CMD ["nameko", "run", "--config", "config.yaml", "service.overseer.overseer:Overseer"]
 
 COPY ./app /app

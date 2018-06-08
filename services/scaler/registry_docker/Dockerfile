@@ -8,5 +8,10 @@ RUN echo $'notifications:\n\
       url: http://scaler_docker:8000/event\n\
       timeout: 250ms\n\
       threshold: 5\n\
+      backoff: 10s\n\
+    - name: maiev-global\n\
+      url: http://global:8000/event\n\
+      timeout: 250ms\n\
+      threshold: 5\n\
       backoff: 10s\n'\
 >> /etc/docker/registry/config.yml

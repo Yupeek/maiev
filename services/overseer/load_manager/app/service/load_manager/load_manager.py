@@ -87,7 +87,7 @@ class LoadManager(BaseWorkerService):
 
         if 'scale' in diff or 'mode' in diff:
             my_service['mode'] = service['mode']
-        if 'scale_config' in diff:
+        if 'scale_config' in diff and 'scale' in service['scale_config']:
             my_service['scale_config'] = service['scale_config']
             self._set_trigger_rules(service['name'], service['scale_config']['scale'])
 

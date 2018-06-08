@@ -68,16 +68,15 @@
       "exec" : ["/usr/bin/docker", "run",
         "--rm", "-i",
         "-v", "{root}/services/maiev-base/app/common/:/app/common:ro",
-        "-v", "{root}/services/maiev-base/run_dev.sh:/run_dev.sh:ro",
-        "-v", "{current_dir}/app/service:/app/service:ro",
+        "{run_dev}",
+        "{service_binding}",
+
         "-v", "{current_dir}/app/scale.json:/app/scale.json:ro",
         "{extra_volume}",
         "-e", "SERVICE_NAME={service_name}",
         "-e FORCE_COLOR=true",
         "{extra_env}",
         "--network={networkname}",
-        "--link", "rabbitmq:rabbitmq",
-        "--link", "maiev_mongodb:maiev_mongodb",
         "{extra_link}",
         "--name={docker_name}",
         "{image_name}",
@@ -96,10 +95,13 @@
     "image_name": "{service_name}:dev",
     "extra_link": "",
     "extra_volume": "",
-    "extra_env": ""
+    "extra_env": "",
+    "run_dev": ["-v", "{root}/services/maiev-base/run_dev.sh:/run_dev.sh:ro"],
+    "service_binding": ["-v", "{current_dir}/app/service:/app/service:ro"]
   },
   "discover": [
     "services",
-    "test"
+    "test",
+    "global"
   ]
 }

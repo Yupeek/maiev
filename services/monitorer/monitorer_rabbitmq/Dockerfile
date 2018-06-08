@@ -5,7 +5,7 @@ RUN if [ "$TARGET" = "dev" ]; then \
 	fi
 
 USER service
-CMD ["nameko", "run", "--config", "config.yaml", "service.monitorer_rabbitmq.monitorer_rabbitmq"]
+CMD ["nameko", "run", "--config", "config.yaml", "service.monitorer_rabbitmq.monitorer_rabbitmq:MonitorerRabbitmq"]
 
 
 COPY ./app /app

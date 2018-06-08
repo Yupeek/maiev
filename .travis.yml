@@ -35,7 +35,7 @@ jobs:
     - env: SERVICE=overseer/dependency_solver
     - env: SERVICE=overseer/overseer
     - env: SERVICE=overseer/load_manager
-    #- env: SERVICE=overseer/upgrade_planer
+    - env: SERVICE=overseer/upgrade_planer
     - env: SERVICE=monitorer/monitorer_rabbitmq
     - env: SERVICE=monitorer/trigger
 

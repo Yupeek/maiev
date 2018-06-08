@@ -13,6 +13,7 @@ from booleano.parser.scope import Bind, SymbolTable
 from nameko.events import EventDispatcher, event_handler
 from nameko.rpc import rpc
 
+from common.base import BaseWorkerService
 from common.db.mongo import Mongo
 from common.dp.generic import GenericRpcProxy
 from common.entrypoint import once
@@ -120,7 +121,7 @@ def get_rule_result(ctx, rule_name, rule):
     return result
 
 
-class Trigger(object):
+class Trigger(BaseWorkerService):
     """
     a service that will listen to all incoming events and compute them with
     boolean rules. finaly, it will dispatch events with resulting value.
