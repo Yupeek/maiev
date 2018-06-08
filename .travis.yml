@@ -38,7 +38,11 @@ jobs:
     - env: SERVICE=overseer/upgrade_planer
     - env: SERVICE=monitorer/monitorer_rabbitmq
     - env: SERVICE=monitorer/trigger
-    - env: SERVICE=../global/
+    - stage: global
+      script:
+      - TARGET=latest make -C services/maiev-base build-image
+      - TARGET=global make build-image
+      - make test -C global
 
 script:
   - TARGET=latest make -C services/maiev-base build-image
