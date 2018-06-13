@@ -126,7 +126,8 @@ class LoadManager(BaseWorkerService):
             service,
             upsert=True,
         )
-        self._set_trigger_rules(service['name'], service['scale_config']['scale'])
+        if 'scale' in service['scale_config']:
+            self._set_trigger_rules(service['name'], service['scale_config']['scale'])
 
     @rpc
     @log_all
