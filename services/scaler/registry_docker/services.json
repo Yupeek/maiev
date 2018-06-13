@@ -11,14 +11,15 @@
         "-p", "5000:5000",
         "--link=scaler_docker:scaler_docker",
         "--name={docker_name}",
-        "{service_name}"
+        "{service_name}:dev"
       ],
       "execStop": [
         "/usr/bin/docker",
         "stop",
         "{docker_name}"
       ],
-      "type": "infra"
+      "type": "script",
+      "waitUntil": 2500
     }
   ],
   "context": {

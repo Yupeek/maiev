@@ -5,17 +5,19 @@ from functools import partial
 
 import pymongo
 import pyparsing
-from common.db.mongo import Mongo
-from common.entrypoint import once
-from common.utils import filter_dict, log_all
-from nameko.events import EventDispatcher, event_handler
-from nameko.rpc import rpc
-
 from booleano.operations.operands.constants import Constant
 from booleano.operations.variables import BooleanVariable, DurationVariable
 from booleano.parser.core import EvaluableParseManager
 from booleano.parser.grammar import Grammar
 from booleano.parser.scope import Bind, SymbolTable
+from nameko.events import EventDispatcher, event_handler
+from nameko.rpc import rpc
+
+from common.base import BaseWorkerService
+from common.db.mongo import Mongo
+from common.dp.generic import GenericRpcProxy
+from common.entrypoint import once
+from common.utils import filter_dict, log_all
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +121,7 @@ def get_rule_result(ctx, rule_name, rule):
     return result
 
 
-class Trigger(object):
+class Trigger(BaseWorkerService):
     """
     a service that will listen to all incoming events and compute them with
     boolean rules. finaly, it will dispatch events with resulting value.
@@ -167,6 +169,8 @@ class Trigger(object):
 
     dispatch = EventDispatcher()
 
+    monitorer_rpc = GenericRpcProxy()
+
     # ####################################################
     #                 ONCE
     # ####################################################
@@ -202,6 +206,7 @@ class Trigger(object):
             'the payload does not contains the required keys'
 
         q = {'resources.monitorer': payload['monitorer'], 'resources.identifier': payload['identifier']}
+
         for ruleset in self.mongo.rulesets.find(q):
             for resource in ruleset['resources']:
                 if resource['monitorer'] == payload['monitorer'] and resource['identifier'] == payload['identifier']:
@@ -297,11 +302,14 @@ class Trigger(object):
         """
         logger.debug("added ruleset %s", {'owner': ruleset['owner'], 'name': ruleset['name']})
         ruleset = self._validate_ruleset(ruleset)
-        self.mongo.rulesets.update(
+        self.mongo.rulesets.replace_one(
             {'owner': ruleset['owner'], 'name': ruleset['name']},
             ruleset,
             upsert=True,
         )
+        # ask for monitorer to provide queue ressources datas
+        for resource in ruleset['resources']:
+            self.monitorer_rpc.get(resource['monitorer']).track(resource['identifier'])
 
     @rpc
     @log_all

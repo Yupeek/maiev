@@ -6,7 +6,6 @@
       "require": [
         "super()",
         "scaler_docker",
-        "trigger",
         "mongodb"
       ]
     }

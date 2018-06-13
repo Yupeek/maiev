@@ -6,6 +6,7 @@ from unittest import mock
 import eventlet.greenpool
 from docker.client import DockerClient
 from nameko.testing.services import worker_factory
+
 from service.scaler_docker.scaler_docker import ScalerDocker
 
 logger = logging.getLogger(__name__)

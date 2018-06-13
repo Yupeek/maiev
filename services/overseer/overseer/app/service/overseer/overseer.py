@@ -1,22 +1,30 @@
 # -*- coding: utf-8 -*-
+import copy
 import logging
 import pprint
+import time
 from functools import partial
 
-from common.db.mongo import Mongo
-from common.entrypoint import once
-from common.utils import filter_dict, log_all, make_promise, merge_dict, ImageVersion
 from nameko.events import SERVICE_POOL, EventDispatcher, event_handler
 from nameko.exceptions import UnknownService
 from nameko.rpc import RpcProxy, rpc
 from promise.promise import Promise
 
+from common.base import BaseWorkerService
+from common.db.mongo import Mongo
+from common.entrypoint import once
+from common.utils import ImageVersion, filter_dict, log_all, make_promise
+
 logger = logging.getLogger(__name__)
 
 
-class Overseer(object):
+class NotMonitoredServiceException(Exception):
+    pass
+
+
+class Overseer(BaseWorkerService):
     """
-    the main orchestation service
+    the main orchestation service. manages upgrades of services and propagate events for new version etc.
 
     public events
     #############
@@ -37,18 +45,90 @@ class Overseer(object):
 
     """
     name = 'overseer'
-    dispatch = EventDispatcher()
     scaler_docker = RpcProxy("scaler_docker")
     """
-    :type: scaler_docker.ScalerDocker
+    :type: service.scaler_docker.scaler_docker.ScalerDocker
     """
     trigger = RpcProxy('trigger')
     """
     :type: service.trigger.trigger.Trigger
     """
+    load_manager = RpcProxy('overseer_load_manager')
+    """
+    :type: service.load_manager.load_manager.LoadManager
+    """
     mongo = Mongo(name)
     """
-    :type: mongo.Mongo
+    :type: mongo.MongoClient
+
+    collections
+    ***********
+
+    services
+    ########
+    list of all services managed by overseer::
+
+        name: producer
+        image:
+          type: docker
+          image_info: # ImageVersion.serialize
+            repository: localhost:5000
+            image: maiev
+            tag: producer-1.0.16
+            species: producer
+            version: 1.0.16
+            digest: sha256:581647ffd59fc7dc9b2f164fe299de29bf99fb1cb304c41ea07d8fa3f95f052b
+          full_image_id: localhost:5000/maiev:producer
+        scale_config:  # content of scale_info
+
+        mode:
+          name: replicated
+          replicas: 23
+
+    """
+
+    dispatch = EventDispatcher()
+    """
+    events
+    ******
+
+    service_updated
+    ###############
+
+    dispatched each time a service is updated. either his image or his replicas count.
+
+    payload: content of the service and the computed diff between old and new states.::
+
+        service:
+          name: producer
+          image:
+            type: docker
+            image_info: # ImageVersion.serializ
+              repository: localhost:5000
+              image: maiev
+              tag: producer-1.0.16
+              species: producer
+              version: 1.0.16
+              digest: sha256:581647ffd59fc7dc9b2f164fe299de29bf99fb1cb304c41ea07d8fa3f95f052b
+            full_image_id: localhost:5000/maiev:producer
+          scale_config:  # content of scale_info
+          mode:
+            name: replicated
+            replicas: 23
+        diff:
+          image: # facultatif
+            from: #image_info
+            to: #image_info
+          replicas: # facultatif
+            from:
+              name: replicated
+              replicas: 2
+            to:
+              name: global
+          scale: # facultatif
+            from: 2
+            to: 3
+
     """
 
     type_to_scaler = {
@@ -61,53 +141,55 @@ class Overseer(object):
     # ####################################################
 
     @event_handler(
-        "scaler_docker", "service_updated", handler_type=SERVICE_POOL, reliable_delivery=False
+        "scaler_docker", "service_updated", handler_type=SERVICE_POOL, reliable_delivery=True
     )
     @log_all
     def on_service_updated(self, payload):
-        logger.debug("notified service updated with %s", payload)
-        service_data = payload['service']
-        service = self._get_service(service_data['name'])
-        scaler = self._get_scaler(service)
-        self.__update_service_data(service_data, scaler, service)
-
-    @event_handler(
-        'trigger', 'ruleset_triggered', handler_type=SERVICE_POOL
-    )
-    @log_all
-    def on_ruleset_triggered(self, payload):
         """
-        event send by the trigger service each time a ruleset has changed his state.
-        expected payload :
-        >>> {
-        ...    'ruleset': {'owner': ..., 'name': ..., },
-        ...    'rules_stats': {'rule1': True, 'rule2': False},
-        ... }
-
+        update the state of the updated service and dispatch service_ùpdated
+        :param payload:
         :return:
         """
-        logger.debug("ruleset_tirgger payload : %s", payload)
-        assert set(payload.keys()) <= {'ruleset', 'rules_stats'}, \
-            'the payload does not contains the required keys'
-        ruleset = payload['ruleset']
+        logger.debug("notified service updated with %s", payload)
+        service_data = payload['service']
+        attributes = payload.get('attributes', {})
+        service = self._get_service(service_data['name'])
+        diff = self._compute_diff(service_data, service, attributes)
+        scaler = self._get_scaler(service)
+        self._save_service_state(service_data, scaler, service)
+        if diff:
+            self.dispatch('service_updated', {"service": filter_dict(service), "diff": diff})
 
-        if ruleset.get('owner') == 'overseer' and ruleset.get('name'):
-            service = self.get_service(ruleset['name'])
-            result = payload['rules_stats']
-            logger.debug("found service %s\n rules changed : %s", service, result)
-            if result.get('__scale_up__'):
-                delta = +1
-            elif result.get('__scale_down__'):
-                delta = -1
-            else:
-                delta = 0
-
-            current, best = self._get_best_scale(service, delta=delta)
-            if current != best:
-                logger.debug("rules triggered new scale: %s => %s", current, best)
-                self._update_service(service, scale=best)
-            else:
-                logger.debug("asked delta of %s: but bestscale still is %s", delta, current)
+    @event_handler(
+        "overseer", "service_updated", handler_type=SERVICE_POOL, reliable_delivery=True
+    )
+    @log_all
+    def check_new_scale_config(self, payload):
+        """
+        check if the image is changed, this mean a new scaler-config is changed too ?
+        :param dict payload: the payload sent by self.on_service_updated
+        :return:
+        """
+        diff = payload['diff']
+        if diff.get('image'):
+            image_version = ImageVersion.deserialize(diff['image']['to'])
+            scale_config = self.scaler_docker.fetch_image_config(image_version.unique_image_id)
+            service_ = payload['service']
+            if service_['scale_config'] != scale_config:
+                self.mongo.services.update_one(
+                    {'name': service_['name']},
+                    {'$set': {
+                        "scale_config": scale_config,
+                    }}
+                )
+                diff = {
+                    "scale_config": {'from': copy.deepcopy(service_['scale_config']), 'to': scale_config},
+                }
+                service_['scale_config'] = scale_config
+                self.dispatch('service_updated', {
+                    'service': service_,
+                    'diff': diff,
+                })
 
     @event_handler(
         "scaler_docker", "image_updated", handler_type=SERVICE_POOL, reliable_delivery=False
@@ -123,36 +205,22 @@ class Overseer(object):
             - [O]version : displayed version
             - [O]digest: the digest for this image
         """
-        logger.debug("received image update notification %s", payload)
         scaler_type = self.reversed_type_to_scaler[payload['from']]
         assert scaler_type == 'docker'
-        assert set(payload) >= {'repository', 'image', 'tag', 'digest'}
+        if set(payload) < {'repository', 'image', 'tag', 'digest'}:
+            return  # update can be called with blob update instead of images
 
-        new_image_version = ImageVersion.from_scaler(payload)
-        logger.debug("version found for this push : %s", new_image_version)
+        image_version = ImageVersion.from_scaler(payload)
+        logger.debug("version found for this push : %s. searching for %s", image_version, image_version.image_id)
 
-        for service in self._get_services(scaler_type=scaler_type, full_image_id=new_image_version.image_id):
-            logger.debug("check for updating %s", service['name'])
-            current_image_version = ImageVersion.deserialize(service['image']['image_info'])
-            logger.debug("current image: %s new one : %s", current_image_version, new_image_version)
-            if current_image_version == new_image_version:
-                logger.debug("service %s already with the notified image", service['name'])
-                continue
-
-            # manage the new scale config
-            new_scale_config = payload['scale_config'] or {}
-
-            if new_scale_config.get('auto_update', True) and new_image_version > current_image_version:
-                current, new_scale_size = self._get_best_scale(service)
-                extra_args = dict(
-                    image_id=new_image_version.unique_image_id
-                )
-                if new_scale_size is not None and current != new_scale_size:
-                    extra_args['scale'] = new_scale_size
-                logger.info("updating %s with %s", service['name'], extra_args)
-                self._update_service(service, **extra_args).then(
-                    partial(self.__update_scale_config, service=service)
-                )
+        for service in self._get_services(scaler_type=scaler_type, full_image_id=image_version.image_id):
+            scale_config = self.scaler_docker.fetch_image_config(image_version.unique_image_id)
+            logger.debug("will dispatch new event for service %s", service['name'])
+            self.dispatch("new_image", {
+                "service": filter_dict(service),
+                "image": image_version.serialize(),
+                "scale_config": scale_config
+            })
 
     # ####################################################
     #                 ONCE
@@ -161,13 +229,14 @@ class Overseer(object):
     @once
     @log_all
     def fetch_services(self):
+        time.sleep(4)
         if not self.mongo.services.find_one():
             for scaler in self._get_scalers():
                 result = scaler.list_services()
                 for service in result:
                     if 'rabbitmq' not in service['name']:
                         self.monitor(scaler.type, service['name'])
-        logger.debug("services: %s", pprint.pformat(list(self.mongo.services.find()), indent=2))
+            logger.debug("services: %s", pprint.pformat(list(self.mongo.services.find()), indent=2, width=119))
 
     # ####################################################
     #                 RPC
@@ -193,7 +262,7 @@ class Overseer(object):
         """
         existing_service = self.get_service(service_name)
         if existing_service:
-            logger.error("ask for monitoring an already registered service %s" % service_name)
+            logger.info("ask for monitoring an already registered service  update it%s" % service_name)
 
         scaler = self._get_scaler(scaler_name)
         service_data = scaler.get(service_name=service_name)
@@ -213,8 +282,13 @@ class Overseer(object):
             },
             "mode": service_data['mode']
         }
-        self.mongo.services.insert_one(result)
-        self._set_trigger_rules(result)
+        self.mongo.services.update(
+            {'name': service_name},
+            result,
+            upsert=True,
+        )
+        self.load_manager.monitor_service(result)
+        self.dispatch('service_updated', {"service": filter_dict(result), "diff": {}})
 
     @rpc
     def list_service(self):
@@ -254,34 +328,30 @@ class Overseer(object):
         return [filter_dict(d) for d in s]
 
     @rpc
-    @log_all
-    def get_best_scale(self, service_name):
-        return self._get_best_scale(self._get_service(service_name))
+    @log_all(NotMonitoredServiceException)
+    def scale(self, service_name, scale):
+        """
+        scale the given service by his name to the given amount of instances.
+        :param str service_name:  the name of the service
+        :param int scale:  the number of instance required (don't check anything)
+        :return:
+        """
+        logger.debug("scaling service %s to %s", service_name, scale)
+        service = self.get_service(service_name)
+        logger.debug("scaling service: %s", service)
+        if service is None:
+            raise NotMonitoredServiceException("service %s is not monitored by overseer" % service_name)
+        self._update_service(service, scale=scale)
 
     @rpc
     @log_all
-    def reload_from_scaler(self, service_name):
-        """
-        reload all available metric/config from the scaler for a given service.
-        :param service_name: the service's name
-        :return: the new service config
-        """
-        service = self._get_service(service_name)
+    def upgrade_service(self, service_name, image_id):
+        if isinstance(image_id, dict):
+            image_id = ImageVersion.deserialize(image_id).unique_image_id
+        service = self.get_service(service_name)
         if service is None:
-            raise UnknownService(service_name)
-        # update scaler config
-        scaler = self._get_scaler(service)
-        current_image_version = ImageVersion.deserialize(service['image']['image_info'])
-
-        update_scale_config = make_promise(scaler.fetch_image_config.call_async(current_image_version.unique_image_id)).then(
-            partial(self.__update_scale_config, service=service)
-        )
-
-        update_service = make_promise(scaler.get.call_async(service_name)).then(
-            partial(self.__update_service_data, scaler=scaler, service=service))
-
-        Promise.all([update_scale_config, update_service]).get()
-        return filter_dict(service)
+            raise NotMonitoredServiceException("service %s is not monitored by overseer" % service_name)
+        self._update_service(service, image_id=image_id)
 
     # #######################################################
     #                    PRIVATE FUNCTIONS
@@ -325,43 +395,16 @@ class Overseer(object):
         :param kwargs:
         :rtype: Promise
         """
-
-        promise = make_promise(self._get_scaler(service).update.call_async(
+        self._get_scaler(service).update.call_async(
             service_name=service['name'],
             **kwargs
-        ))
-
-        return promise
-
-    def _get_best_scale(self, service, delta=0):
-        """
-        return the best scale value for a service.
-        :param service: the service to compute
-        :param delta: the +1 or -1 if the service is in load or not
-        :return: the current scale value and the best one
-        :rtype: tuple(int, int)
-        """
-        mode = service.get('mode', {'name': 'replicated', 'replicas': 1})
-        scale_config = service.get('scale_config') or {}
-
-        if mode['name'] == 'replicated':
-            current = mode['replicas']
-            best = current
-
-            # TODO: compute for load here
-            best += delta
-            # respect max/min from scale_config
-            best = max((best, scale_config.get('min', 0)))
-            best = min((best, scale_config.get('max', best)))
-            return current, best
-        else:
-            return None, None
+        )
 
     # ###################################################################
     #                       common method
     # ###################################################################
 
-    def __update_service_data(self, service_data, scaler, service):
+    def _save_service_state(self, service_data, scaler, service):
         """
         update thee given service in base and in-memory with service_data
         :param service:
@@ -370,7 +413,6 @@ class Overseer(object):
         # update replicas current status
         service['mode'] = service_data['mode']
         imageversion = ImageVersion.from_scaler(service_data)
-        logger.debug("image version %s", imageversion.data)
         service['image'] = {
             "type": scaler.type,
             "image_info": imageversion.serialize(),
@@ -384,59 +426,29 @@ class Overseer(object):
             }}
         )
 
-    def __update_scale_config(self, new_scale_config, service):
-        scale_config = service.get('scale_config') or {}
-        if new_scale_config:
-            merged = merge_dict(scale_config, new_scale_config)
-            if merged:
-                # the scale config has been updated
-                service['scale_config'] = scale_config
-                self.mongo.services.update_one({'_id': service['_id']}, {'$set': {"scale_config": scale_config}})
-                self._set_trigger_rules(service)
-                logger.debug("updated scale config for %s" % service['name'])
-
-    def _set_trigger_rules(self, result):
-        logger.debug("inserted service %s: \n%s", result['name'], result)
-        # now, we add the trigger config to scale automaticaly this service upon events.
-        ruleset = self._create_trigger_ruleset(result)
-        try:
-            test = self.trigger.compute(ruleset)
-            if test['status'] == 'success':
-                self.trigger.add(ruleset)
-            else:
-                logger.error("imposible to add the ruleset %s: %s", ruleset, test)
-        except UnknownService:
-            logger.error("trigger service is not available. can't set the rules")
-
-    def _create_trigger_ruleset(self, service):
+    def _compute_diff(self, service_data, service, attributes):
         """
-        create the trigger ruleset for the given service
-        :param service:
-        :return:
+        return a dict with the diff between the old state and the new state of a service.
+        currently check: scale, images, scale_config, env.
+        {"change item": {"from": oldval, "to": newval}}
+        :param service_data: the data of the service from the changed event
+        :param service: the service as saved in the database befor the change.
+        :return: the dict with the changes. in form: {'from': ..., 'to': ...} with the folowing parts:
+
+            - scale: the number of instances
+            - mode: the mode if changes (name + replicas)
+            - image: the imageversion serialized if changed
+
         """
-
-        rules = []
-        scale_config_ = service.get('scale_config') or {}
-        trigger_config = scale_config_.get('scale', {})
-        for rule in trigger_config.get('rules', ()):
-            if rule['name'] in ("__scale_up__", "__scale_down__"):
-                logger.warning('scale_config contains reserved rule name %s. this one is ignored', rule['name'])
+        changes = {}
+        if service_data['mode'] != service['mode']:
+            if service_data['mode']['name'] == "replicated" and service['mode']['name'] == "replicated":
+                changes['scale'] = {'from': service['mode']['replicas'], 'to': service_data['mode']['replicas']}
             else:
-                rules.append(rule)
-        if 'scale_up' in trigger_config:
-            rules.append({
-                'name': '__scale_up__',
-                'expression': trigger_config['scale_up']
-            })
-        if 'scale_down' in trigger_config:
-            rules.append({
-                'name': '__scale_down__',
-                'expression': trigger_config['scale_down']
-            })
-
-        return {
-            'owner': self.name,
-            'name': service['name'],
-            'resources': trigger_config.get('resources', ()),
-            'rules': rules
-        }
+                changes['mode'] = {'from': service['mode'], 'to': service_data['mode']}
+        img_version_serialized = ImageVersion.from_scaler(service_data).serialize()
+        if img_version_serialized != service['image']['image_info']:
+            changes['image'] = {'from': service['image']['image_info'], 'to': img_version_serialized}
+        if 'updatestate.new' in attributes:
+            changes['state'] = {'from': attributes.get('updatestate.old'), 'to': attributes['updatestate.new']}
+        return changes

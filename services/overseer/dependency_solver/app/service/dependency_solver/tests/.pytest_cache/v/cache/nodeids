@@ -1,0 +1,12 @@
+[
+  "test_dependency_solver.py::TestSolver::()::test_build_symbol",
+  "test_dependency_solver.py::TestSolver::()::test_build_conditions",
+  "test_dependency_solver.py::TestSolver::()::test_solve",
+  "test_dependency_solver.py::TestSolver::()::test_solve_extra1",
+  "test_dependency_solver.py::TestSolver::()::test_solve_extra2",
+  "test_dependency_solver.py::TestSolver::()::test_solve_not_possible",
+  "test_dependency_solver.py::TestSolver::()::test_insolvable",
+  "test_dependency_solver.py::TestSolver::()::test_added_solution_insolvable",
+  "test_dependency_solver.py::TestExplain::()::test_explain_1",
+  "test_dependency_solver.py::TestExplain::()::test_explain_uniqu"
+]

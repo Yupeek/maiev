@@ -20,11 +20,13 @@ class RabbitMqApi(object):
         final_url = urllib.parse.urljoin(self.base_url, "/".join([urllib.parse.quote(p, '') for p in url_parts]))
         if params:
             final_url += "?%s" % urllib.parse.urlencode(params)
-
-        response = self.session.get(final_url)
+        try:
+            response = self.session.get(final_url)
+        except Exception:
+            logger.exception("error while connecting to %s", final_url)
+            return None
 
         if response.status_code == 404:
-            logger.exception("the requested ressource does not exists for %s", url_parts)
             return None
         try:
             return response.json()

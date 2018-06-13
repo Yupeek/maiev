@@ -6,6 +6,18 @@ a monitoring cluster that scale inscances up and down based on message queue lat
 the main goal of micro-services is scalability, rolling updates and no-downtimes. this software
 has for main goal to painlessly update/scale and monitor a cluster of micro-services.
 
+
+Stable branch
+
+.. image:: https://img.shields.io/travis/Yupeek/maiev/master.svg
+    :target: https://travis-ci.org/Yupeek/maiev
+
+Development status
+
+.. image:: https://img.shields.io/travis/Yupeek/maiev/develop.svg
+    :target: https://travis-ci.org/Yupeek/maiev
+
+
 how it work :
 
 1. it monitore the latency of rpc calls for all micro-services
@@ -37,14 +49,14 @@ current delevoppement status:
 
   - auto update on push: ok
   - parse version and upgrade only: ok
-  - dependency requirement: no
+  - dependency requirement: wip
   - helped deployments: no
 
-- monitoring/autoscaling 70%
+- monitoring/autoscaling 85%
 
   - rules parsing: ok
   - services custom rules: ok
-  - rabbitmq monitoring: wip
+  - rabbitmq monitoring: ok
   - scale up/down from rule result: wip
 
 - management 05%

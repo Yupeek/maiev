@@ -4,6 +4,7 @@
       "name": "{dirname}",
       "extends": "docker",
       "context": {
+        "extra_env": ["-e", "MONITORED_SERVER_URL=http://guest:guest@192.168.253.141:15672/api/"]
       },
       "extraData": [
         {

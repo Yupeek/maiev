@@ -1,0 +1,27 @@
+{
+  "min": 1,
+  "max": 10,
+  "dependencies": {
+    "require": [
+      "overseer:rpc:scale",
+      "\"scale\" in overseer:rpc:scale:args",
+      "trigger:rpc:delete",
+      "{\"owner\", \"rule_name\"} in trigger:rpc:delete:args",
+      "overseer:event:service_updated",
+      "{\"diff\", \"service\"} in overseer:event:service_updated:params"
+    ],
+    "provide": {
+      "load_manager:event:scale": 1,
+      "load_manager:event:scale:params": ["scale", "extra_constraints"]
+    },
+    "optional": [
+    ]
+  },
+  "metric": [
+  ],
+  "envs": [
+
+  ],
+  "scale": {
+  }
+}

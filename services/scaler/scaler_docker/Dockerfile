@@ -1,13 +1,14 @@
 
 FROM maiev-base:latest
 
-COPY ./app/requirements.txt /app/
+ARG TARGET=test
+RUN if [ "$TARGET" = "dev" ]; then \
+	npm install --prefix /app_dev supervisor concurrently ;\
+	fi
+
+COPY ./app/requirements.txt /app
 
 RUN test ! -f requirements.txt || pip3 install -r requirements.txt
-# build part
-
-# cleanup after build
-RUN apk del gcc linux-headers
 
 RUN ln -s /run/secrets/docker_manager_tls.pem /app/ca.pem && \
 	ln -s /run/secrets/docker_manager_tls.pem /app/cert.pem && \

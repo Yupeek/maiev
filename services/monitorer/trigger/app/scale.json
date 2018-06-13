@@ -1,14 +1,25 @@
 {
   "min": 1,
   "max": 1,
-  "dependences": {
-    "required": [
-      {
-        "name": "overseer_mongodb",
-        "type": "docker",
-        "image": "health_mongodb"
-      }
+  "dependencies": {
+    "require": [
+      "\"metrics.exists\" in monitorer_rabbitmq:event:metrics_updated:params",
+      "monitorer_rabbitmq:rpc:track >= 1"
     ],
+    "provide": {
+      "trigger:rpc:compute": 1,
+      "trigger:rpc:compute:args": ["ruleset"],
+      "trigger:rpc:add": 1,
+      "trigger:rpc:add:args": ["ruleset"],
+      "trigger:rpc:delete": 1,
+      "trigger:rpc:delete:args": ["owner", "rule_name"],
+      "trigger:rpc:purge": 1,
+      "trigger:rpc:purge:args": ["owner"],
+      "trigger:rpc:list": 1,
+      "trigger:rpc:list:args": ["_filter"],
+      "trigger:event:ruleset_triggered": 1,
+      "trigger:event:ruleset_triggered:params": ["ruleset", "rules_stats"]
+    },
     "optional": [
     ]
   },

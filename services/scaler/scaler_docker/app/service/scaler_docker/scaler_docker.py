@@ -1,15 +1,18 @@
 # -*- coding: utf-8 -*-
-
+import datetime
 import json
 import logging
+import pprint
 
 import docker.errors
-from common.dependency import PoolProvider
-from common.utils import log_all
 from docker.types.services import ServiceMode
 from nameko.events import EventDispatcher
 from nameko.rpc import rpc
 from nameko.web.handlers import http
+
+from common.dependency import PoolProvider
+from common.entrypoint import once
+from common.utils import log_all
 from service.dependency.docker import DockerClientProvider
 
 logger = logging.getLogger(__name__)
@@ -129,6 +132,10 @@ class ScalerDocker(object):
     :type: eventlet.greenpool.GreenPool
     """
 
+    # ####################################################
+    #   HTTP endpoints
+    # ####################################################
+
     @http('GET', '/')
     def ping(self, request):
         return 'OK'
@@ -153,9 +160,29 @@ class ScalerDocker(object):
                     self._parse_event_from_hub(data)
             except Exception:
                 logger.exception("error while receiving docker push notification")
+
         self.pool.spawn(propagate_events)
 
         return ''
+
+    # ####################################################
+    #   Once endpoints
+    # ####################################################
+
+    @once
+    @log_all
+    def start_listen_events(self):
+        for event in self.docker.events(since=datetime.datetime.now(), decode=True):
+            if event['Action'] == 'update':
+                self.dispatch('service_updated', {
+                    'service': self.get(service_id=event['Actor']['ID']),
+                    'attributes': event['Actor']['Attributes'],
+                })
+                pprint.pprint(event)
+
+    # ####################################################
+    #  RPC endpoints
+    # ####################################################
 
     @rpc
     @log_all
@@ -175,9 +202,7 @@ class ScalerDocker(object):
                 attrs['mode'] = ServiceMode('global', 1)
             else:
                 attrs['mode'] = ServiceMode('replicated', scale)
-        service.update_preserve(**attrs)
-
-        self.dispatch('service_updated', {'service': self.get(service_id=service.id)})
+        service.update(fetch_current_spec=True, **attrs)
 
     @rpc
     @log_all(ValueError)
@@ -216,9 +241,9 @@ class ScalerDocker(object):
             image_full_id = image_full_id.get('image_full_id', None) or recompose_full_id(image_full_id)
         try:
             result = self.docker.containers.run(image_full_id, 'scale_info', remove=True).decode('utf-8')
-        except (docker.errors.NotFound, docker.errors.ContainerError):
-            logger.info("docker image %s don't contains scale_info executable", image_full_id,)
-            logger.debug("extra error for scaler_info", exc_info=True)
+        except (docker.errors.NotFound, docker.errors.ContainerError) as e:
+            if "executable file not found in " not in str(e):
+                logger.debug("extra error for scaler_info", exc_info=True)
             return None
         else:
             try:
@@ -276,7 +301,7 @@ class ScalerDocker(object):
             'image': data['repository']['name'],
             'repository': data['repository']['namespace'],
             'full_image_id': '%s/%s:%s' % (data['repository']['namespace'], data['repository']['name'],
-                                                        push_data['tag']), 'tag': push_data['tag']
+                                           push_data['tag']), 'tag': push_data['tag']
         }
 
         try:

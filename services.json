@@ -8,23 +8,30 @@
         "--rm",
         "--name={name}",
         "--network={networkname}",
+        "{volume}",
+        "{port}",
         "{image_name}"
       ],
       "execStop": [ "/usr/bin/docker", "stop", "{name}" ],
       "context": {
         "name": "{service_name}_{engine_name}",
-        "image_name": "health_{engine_name}"
+        "image_name": "health_{engine_name}:dev",
+        "port": "",
+        "volume": ""
       },
       "abstract": true,
-      "type": "db"
+      "waitUntil": 5000,
+      "type": "script"
     },
     {
       "name": "mongodb",
-      "type": "db",
       "extends": "docker-db",
       "retry": 2,
+      "waitUntilStr": "waiting for connections on port ",
       "context": {
-        "engine_name": "mongodb"
+        "volume": ["-v", "db-mongo:/data/db"],
+        "engine_name": "mongodb",
+        "port": ["-p", "27017:27017"]
       }
     },
     {
@@ -36,7 +43,8 @@
         "--network={networkname}",
         "rabbitmq:3-management"],
       "execStop": [ "/usr/bin/docker", "stop", "rabbitmq"],
-      "type": "infra",
+      "waitUntil": 60000,
+      "waitUntilStr": "Server startup complete;",
       "extraData": [
         {
           "name": "rabbitmq management",
@@ -56,41 +64,44 @@
     },
     {
       "name": "docker",
+      "waitUntil": 2500,
       "exec" : ["/usr/bin/docker", "run",
         "--rm", "-i",
         "-v", "{root}/services/maiev-base/app/common/:/app/common:ro",
-        "-v", "{root}/services/maiev-base/run_dev.sh:/run_dev.sh:ro",
-        "-v", "{current_dir}/app/service:/app/service:ro",
+        "{run_dev}",
+        "{service_binding}",
+
         "-v", "{current_dir}/app/scale.json:/app/scale.json:ro",
         "{extra_volume}",
         "-e", "SERVICE_NAME={service_name}",
         "-e FORCE_COLOR=true",
         "{extra_env}",
         "--network={networkname}",
-        "--link", "rabbitmq:rabbitmq",
-        "--link", "maiev_mongodb:maiev_mongodb",
         "{extra_link}",
         "--name={docker_name}",
-        "{service_name}",
+        "{image_name}",
         "/run_dev.sh"],
       "execStop": ["/usr/bin/docker", "stop", "{docker_name}"],
       "require": [
         "rabbitmq"
       ],
-      "abstract": true,
-      "type": "Wr"
+      "abstract": true
     }
   ],
   "context": {
     "service_name": "{dirname}",
     "docker_name": "{service_name}",
     "networkname": "maiev-dev",
+    "image_name": "{service_name}:dev",
     "extra_link": "",
     "extra_volume": "",
-    "extra_env": ""
+    "extra_env": "",
+    "run_dev": ["-v", "{root}/services/maiev-base/run_dev.sh:/run_dev.sh:ro"],
+    "service_binding": ["-v", "{current_dir}/app/service:/app/service:ro"]
   },
   "discover": [
     "services",
-    "test"
+    "test",
+    "global"
   ]
 }

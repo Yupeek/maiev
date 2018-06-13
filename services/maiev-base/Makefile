@@ -1,10 +1,7 @@
+SERVICE_NAME ?= $(shell basename $(CURDIR))
+TEST_CMD ?= py.test common --cov=common
+MAIN_DIR ?= common
+
+
 
 include ../Makefile.inc
-
-
-build-image:  ## build this image docker
-	docker build \
-		-t $(SERVICE_NAME) \
-		--build-arg USERID=$(shell id -u) \
-		--build-arg GROUPID=$(GROUPID) \
-		.

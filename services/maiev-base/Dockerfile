@@ -2,6 +2,7 @@
 FROM python:3.6-alpine
 
 
+ENV PYTHONPATH=/app
 ENV RABBITMQ_USER guest
 ENV  RABBITMQ_PASSWORD guest
 ENV RABBITMQ_HOST rabbitmq
@@ -13,7 +14,7 @@ ARG GROUPID=$USERID
 
 
 RUN addgroup -g $GROUPID service;  adduser -D -u $USERID -G $(getent group $GROUPID | cut -d: -f1) service
-RUN mkdir /app_dev && chown $USERID:$GROUPID /app_dev
+RUN chown $USERID:$GROUPID /app
 
 RUN apk add --no-cache gcc linux-headers musl-dev nodejs
 COPY ./app/extra_package/ /app/extra_package/
