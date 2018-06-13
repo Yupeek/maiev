@@ -213,21 +213,23 @@ class TestUpgradePlaner(object):
         upgrade_planer.mongo.catalog.find.return_value = [{
             "name": "consumer",
             "service": service['consumer'],
-            "versions_list": [{"version": "1.0.16", "dependencies": {
-                "require": [
-                    "producer:rpc:echo"
-                ]
-            }}],
+            "versions_list": [
+                {"version": "1.0.16", "dependencies": {
+                    "require": [
+                        "producer:rpc:echo"
+                    ]
+                }}],
 
             "version": service['consumer']['image']['image_info']['version'],
         }, {
             "name": "producer",
             "service": service['producer'],
-            "versions_list": [{"version": "1.0.16", "dependencies": {
-                "provide": {
-                    "producer:rpc:echo": 1
-                }}}
-                              ],
+            "versions_list": [
+                {"version": "1.0.16", "dependencies": {
+                    "provide": {
+                        "producer:rpc:echo": 1
+                    }}}
+            ],
             "version": service['producer']['image']['image_info']['version'],
 
         }
@@ -260,21 +262,23 @@ class TestUpgradePlaner(object):
         upgrade_planer.mongo.catalog.find.return_value = [{
             "name": "consumer",
             "service": service['consumer'],
-            "versions_list": [{"version": "1.0.15", "dependencies": {
-                "require": [
-                    "producer:rpc:echo"
-                ]
-            }}
-                              ],
+            "versions_list": [
+                {"version": "1.0.15", "dependencies": {
+                    "require": [
+                        "producer:rpc:echo"
+                    ]
+                }}
+            ],
             "version": service['consumer']['image']['image_info']['version']
         }, {
             "name": "producer",
             "service": service['producer'],
-            "versions_list": [{"version": "1.0.15", "dependencies": {
-                "provide": {
-                    "producer:rpc:echo": 1
-                }}}
-                              ],
+            "versions_list": [
+                {"version": "1.0.15", "dependencies": {
+                    "provide": {
+                        "producer:rpc:echo": 1
+                    }}}
+            ],
             "version": service['producer']['image']['image_info']['version'],
         }
         ]
@@ -294,21 +298,23 @@ class TestUpgradePlaner(object):
         upgrade_planer.mongo.catalog.find.return_value = [{
             "name": "consumer",
             "service": service['consumer'],
-            "versions_list": [{"version": "1.0.15", "dependencies": {
-                "require": [
-                    "producer:rpc:echo"
-                ]
-            }}
-                              ],
+            "versions_list": [
+                {"version": "1.0.15", "dependencies": {
+                    "require": [
+                        "producer:rpc:echo"
+                    ]
+                }}
+            ],
             "version": service['consumer']['image']['image_info']['version'],
         }, {
             "name": "producer",
             "service": service['producer'],
-            "versions_list": [{"version": "1.0.15", "dependencies": {
-                "provide": {
-                    "producer:rpc:echo": 1
-                }}}
-                              ],
+            "versions_list": [
+                {"version": "1.0.15", "dependencies": {
+                    "provide": {
+                        "producer:rpc:echo": 1
+                    }}}
+            ],
             "version": service['producer']['image']['image_info']['version'],
 
         }
@@ -357,39 +363,39 @@ class TestStepComputing(object):
         [
             (  # upgrade two version with only one backward compat
 
-                    {'a': "2", "b": "2"},
-                    {'a': "1", "b": "1"},
-                    [{'a': "2", "b": "1"}],
-                    [('a', '1', '2'), ('b', '1', '2')],
+                {'a': "2", "b": "2"},
+                {'a': "1", "b": "1"},
+                [{'a': "2", "b": "1"}],
+                [('a', '1', '2'), ('b', '1', '2')],
             ),
             (  # upgrade two version with only the other backward compat
 
-                    {'a': "2", "b": "2"},
-                    {'a': "1", "b": "1"},
-                    [{'a': "1", "b": "2"}],
-                    [('b', '1', '2'), ('a', '1', '2')],
+                {'a': "2", "b": "2"},
+                {'a': "1", "b": "1"},
+                [{'a': "1", "b": "2"}],
+                [('b', '1', '2'), ('a', '1', '2')],
             ),
             (  # goal is already applyed
 
-                    {'a': "2", "b": "2"},
-                    {'a': "2", "b": "2"},
-                    [],
-                    [],
+                {'a': "2", "b": "2"},
+                {'a': "2", "b": "2"},
+                [],
+                [],
             ),
             (  # one service to update
 
-                    {'a': "2", "b": "1"},
-                    {'a': "1", "b": "1"},
-                    [{'a': "2", "b": "1"}],
-                    [('a', '1', '2')],
+                {'a': "2", "b": "1"},
+                {'a': "1", "b": "1"},
+                [{'a': "2", "b": "1"}],
+                [('a', '1', '2')],
             ),
             (  # 3 services
 
-                    {'a': "2", "b": "2", 'c': '2'},
-                    {"a": "1", "b": "1", "c": "1"},
-                    [{"a": "1", "b": "1", "c": "2"}, {"a": "1", "b": "2", "c": "2"},
-                     {"a": "1", "b": "2", "c": "1"}],
-                    [('b', '1', '2'), ('c', '1', '2',), ('a', '1', '2')],
+                {'a': "2", "b": "2", 'c': '2'},
+                {"a": "1", "b": "1", "c": "1"},
+                [{"a": "1", "b": "1", "c": "2"}, {"a": "1", "b": "2", "c": "2"},
+                 {"a": "1", "b": "2", "c": "1"}],
+                [('b', '1', '2'), ('c', '1', '2',), ('a', '1', '2')],
             )
         ])
     def test_build_steps_bad_solution(self, goal_param, current_state, compatible_phase, expected, upgrade_planer):
