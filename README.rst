@@ -9,7 +9,7 @@ has for main goal to painlessly update/scale and monitor a cluster of micro-serv
 
 Stable branch
 
-.. image:: https://img.shields.io/travis/Yupeek/maiev/master.svg
+.. image:: https://travis-ci.org/Yupeek/maiev.svg?branch=master
     :target: https://travis-ci.org/Yupeek/maiev
 
 Development status
