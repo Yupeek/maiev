@@ -90,7 +90,7 @@ dev:  ## build images with target dev
 	TARGET=dev $(MAKE) build-image
 
 test-flake8: ## Run flake8 tests
-	$(DOCKER) run $(DOCKER_TEST_ARGS) -i--rm $(TMP_IMAGE_NAME) \
+	$(DOCKER) run $(DOCKER_TEST_ARGS) -i --rm $(TMP_IMAGE_NAME) \
 		flake8 $(MAIN_DIR) --max-complexity 10
 
 test-isort: ## run isort check
