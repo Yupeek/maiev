@@ -25,6 +25,13 @@ cache:
 python:
 - "3.6"
 
+stages:
+  - test
+  - global
+  - name: staging
+    if: branch = develop
+  - name: production
+    if: branch = master AND tag
 
 jobs:
   include:
@@ -45,6 +52,7 @@ jobs:
       - make test -C global
 
     - stage: staging
+      before_install: []
       env:
         - secure: "qtxHIfzPTQcgnPvVy1khUU/ceJQVJFoiF5+L/qfKW8FhIgWdkHExD4PrpkQjzrqsKUi1pqWcj3CXNwSLDzfMqS6rs/CDQFocM3jmCeq8JNm6A7C8C+T4lEZXtGMbdhKSU9cY2rC64vknuHcQ7RDvdn9avumgbXJMzolv67a/6Zy4qAf+BrBLpjWeazHmr4hUV7Ds8DDBgtkrxofqRv6/IrIGWccJAgHZK4hNm7E0JeWCujoSjZu7GhQY5MyuOrErpZ7ood8WD09aFBe5CbNzW6IEFOIGVoQ7ccKi/xY6XXmN/VausqGBFgeXbeGxwbyXAVOjNHr/n0SVkw0jCXj8yWmVkmc1JtWmK1KyqkqXCuB5tJp+obY1dTxgUNqgMGFA+9CqovO6kGEUiJKhRvw7zsnFNGnmrHwbw0UHQOzuJh0NCJXbTw1044GA6OeHYmM2DqQFLLCgUOaKHmLrHZBkW5mzF/kn1PubLuS8uMxnZqWWU1tmfr+8gRe119JL6jzDxEFatHiYLOjfjGof5tsUghEmvw3WXlLrTkDvT0ACxYqQ1N32nntZmraHNpb/pEk49wHHZE9m3nXI+P6b13X0Y0GizTUeaALcEwr2TcChC8ws+vtuKSeXKNbQLUHRzkidsDDHqffP+aflqtB5ZvuR2UQ7+nmRMdqHy3s0AUnidyc="
         - secure: "oZx7FoU0aaS4H3+ST5M+yrv01frGz+083TOzE5q57kD3lXBSexxftc7tuXMaYKdxP7CFCHAcwkfPOUIbYgwwHZrVgHzZVuqyKCji3sgBQDagl5hJTUPwFG0r1L9A5eZFWKm2S0t848mDi6ukPWy/56CYOQPMzu3CKiKYDCqNrZv7hyZx/ZaIwdI4LRqsDp6JjjxvPfBYp2hxr8CL+DILm4iT3pzVhNept3X9Wl1i+YkZ2IrpJYrlDDgq63EWURkA+Nz3N9Tkb+7YeqyJP/gTMnEjl/lbzmuMLxBEDKuU6VJQHArnDbAzNPxrg3HS/ikyVSpHXcGNaIFITWq3xqUIdtcaTeZ/0D+JvEStrFkAJQaLs5PL0LJI8fV+xL5evyW0BXhWuv8+U8JV48hFcO+qMbgff+wYDA9FuLNTyCcOYhx2WwFKP1G85vGO59h6cPehBfms7nTxHoGEiblfeaH4jLFzm/3E23hyA+pJLrurdUnv3I5xYPxgWk+hDa5wzQYW4+QzSbNbsK/1bhJfgrY5kj5ZQ1vCjNDMAgf0tDmel2KXKtkmV2P9qsTcy7hE/uLCO6w9/8ObB7kHWab6G18lMYJF12ZHbBOwkkJ+1ZmfEIFfKE0WazpWh4YER51Xj5v9v4t6aZwVAoRhpfb+YCZSoNklqGK0Sm69siDrIXmLmec="
@@ -55,10 +63,9 @@ jobs:
         - TARGET=latest make -C services/maiev-base build-image
         - TARGET=global make build-image
         - make build-image
-        - IMAGE_VERSION=${TRAVIS_BUILD_NUMBER}b make deploy
-      on:
-        branch: develop
+        - make deploy
     - stage: production
+      before_install: []
       env:
         - secure: "qtxHIfzPTQcgnPvVy1khUU/ceJQVJFoiF5+L/qfKW8FhIgWdkHExD4PrpkQjzrqsKUi1pqWcj3CXNwSLDzfMqS6rs/CDQFocM3jmCeq8JNm6A7C8C+T4lEZXtGMbdhKSU9cY2rC64vknuHcQ7RDvdn9avumgbXJMzolv67a/6Zy4qAf+BrBLpjWeazHmr4hUV7Ds8DDBgtkrxofqRv6/IrIGWccJAgHZK4hNm7E0JeWCujoSjZu7GhQY5MyuOrErpZ7ood8WD09aFBe5CbNzW6IEFOIGVoQ7ccKi/xY6XXmN/VausqGBFgeXbeGxwbyXAVOjNHr/n0SVkw0jCXj8yWmVkmc1JtWmK1KyqkqXCuB5tJp+obY1dTxgUNqgMGFA+9CqovO6kGEUiJKhRvw7zsnFNGnmrHwbw0UHQOzuJh0NCJXbTw1044GA6OeHYmM2DqQFLLCgUOaKHmLrHZBkW5mzF/kn1PubLuS8uMxnZqWWU1tmfr+8gRe119JL6jzDxEFatHiYLOjfjGof5tsUghEmvw3WXlLrTkDvT0ACxYqQ1N32nntZmraHNpb/pEk49wHHZE9m3nXI+P6b13X0Y0GizTUeaALcEwr2TcChC8ws+vtuKSeXKNbQLUHRzkidsDDHqffP+aflqtB5ZvuR2UQ7+nmRMdqHy3s0AUnidyc="
         - secure: "oZx7FoU0aaS4H3+ST5M+yrv01frGz+083TOzE5q57kD3lXBSexxftc7tuXMaYKdxP7CFCHAcwkfPOUIbYgwwHZrVgHzZVuqyKCji3sgBQDagl5hJTUPwFG0r1L9A5eZFWKm2S0t848mDi6ukPWy/56CYOQPMzu3CKiKYDCqNrZv7hyZx/ZaIwdI4LRqsDp6JjjxvPfBYp2hxr8CL+DILm4iT3pzVhNept3X9Wl1i+YkZ2IrpJYrlDDgq63EWURkA+Nz3N9Tkb+7YeqyJP/gTMnEjl/lbzmuMLxBEDKuU6VJQHArnDbAzNPxrg3HS/ikyVSpHXcGNaIFITWq3xqUIdtcaTeZ/0D+JvEStrFkAJQaLs5PL0LJI8fV+xL5evyW0BXhWuv8+U8JV48hFcO+qMbgff+wYDA9FuLNTyCcOYhx2WwFKP1G85vGO59h6cPehBfms7nTxHoGEiblfeaH4jLFzm/3E23hyA+pJLrurdUnv3I5xYPxgWk+hDa5wzQYW4+QzSbNbsK/1bhJfgrY5kj5ZQ1vCjNDMAgf0tDmel2KXKtkmV2P9qsTcy7hE/uLCO6w9/8ObB7kHWab6G18lMYJF12ZHbBOwkkJ+1ZmfEIFfKE0WazpWh4YER51Xj5v9v4t6aZwVAoRhpfb+YCZSoNklqGK0Sm69siDrIXmLmec="
@@ -70,9 +77,7 @@ jobs:
         - TARGET=global make build-image
         - make build-image
         - IMAGE_VERSION=${TRAVIS_TAG}b make deploy
-      on:
-        branch: master
-        tags: true
+        - IMAGE_VERSION=latest make deploy
 
 script:
   - TARGET=latest make -C services/maiev-base build-image
