@@ -16,7 +16,6 @@ MAIN_DIR ?= service
 # updated values
 
 TARGET ?= test
-TEAMCITY_VERSION ?=
 DOCKER_REPO ?= yupeek
 BUILD_NUMBER ?= dev
 SERVICE_FORCE_PUSH ?= \0
@@ -27,8 +26,6 @@ FULL_IMAGE_ID ?= $(IMAGE_NAME):$(SERVICE_NAME)-$(IMAGE_VERSION)
 TMP_IMAGE_NAME ?= $(SERVICE_NAME):$(TARGET)
 
 
-# computed values
-FLAG_TEAMCITY_VERSION ?= $(shell [ -z "$(TEAMCITY_VERSION)" ] || echo "-e  TEAMCITY_VERSION='$(TEAMCITY_VERSION)'" )
 
 help:
 	@grep -Ph '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
@@ -44,7 +41,6 @@ build-image:  ## build this image docker 2
 	@test ! -z "$(TARGET)" || (printf "\033[31;1m build image is now specialized.\033[0m\
 	 	please set \033[35mTARGET\033[0m env to either \033[36mdev\033[0m, \033[36mprod\033[0m or \033[36mtest\033[0m\n" && /bin/false)
 
-	@test -z "$(TEAMCITY_VERSION)" || echo "##teamcity[blockOpened name='building image $(TMP_IMAGE_NAME)']"
 	$(DOCKER) build \
 		--build-arg VERSION=$(IMAGE_VERSION) \
 		--build-arg TARGET=$(TARGET) \
@@ -54,7 +50,6 @@ build-image:  ## build this image docker 2
 		-t $(TMP_IMAGE_NAME) \
 		.
 	@echo built $(TMP_IMAGE_NAME)
-	@test -z "$(TEAMCITY_VERSION)" || echo "##teamcity[blockClosed name='building image $(TMP_IMAGE_NAME)']"
 
 
 # === DEPLOY DOCKER IMAGE
@@ -63,10 +58,8 @@ deploy:  ## deploy the image to $DOCKER_REPO with final tag
 
 	@{ \
 	push_docker() { \
-		test -z "$(TEAMCITY_VERSION)" || echo "##teamcity[blockOpened name='deploing image $(TMP_IMAGE_NAME) as $(DOCKER_REPO)/$(FULL_IMAGE_ID)']"; \
 		$(DOCKER) tag $(TMP_IMAGE_NAME)  $(DOCKER_REPO)/$(FULL_IMAGE_ID); \
 		$(DOCKER) push $(DOCKER_REPO)/$(FULL_IMAGE_ID); \
-		test -z "$(TEAMCITY_VERSION)" || echo "##teamcity[blockClosed name='deploing image $(TMP_IMAGE_NAME) as $(DOCKER_REPO)/$(FULL_IMAGE_ID)']"; \
 	}; \
 	if case $(SERVICE_NAME) in $(SERVICE_FORCE_PUSH)) ;; *) false;; esac; then \
 		echo forcing push; \
@@ -97,25 +90,25 @@ dev:  ## build images with target dev
 	TARGET=dev $(MAKE) build-image
 
 test-flake8: ## Run flake8 tests
-	$(DOCKER) run $(DOCKER_TEST_ARGS) -i $(FLAG_TEAMCITY_VERSION) --rm $(TMP_IMAGE_NAME) \
-		flake8 $(MAIN_DIR) --max-complexity 10 || /bin/true  # teamcity-messages will send errors
+	$(DOCKER) run $(DOCKER_TEST_ARGS) -i--rm $(TMP_IMAGE_NAME) \
+		flake8 $(MAIN_DIR) --max-complexity 10
 
 test-isort: ## run isort check
-	$(DOCKER) run $(DOCKER_TEST_ARGS) -i $(FLAG_TEAMCITY_VERSION) --rm $(TMP_IMAGE_NAME) \
+	$(DOCKER) run $(DOCKER_TEST_ARGS) -i --rm $(TMP_IMAGE_NAME) \
 		isort -rc $(MAIN_DIR)  -c  --diff
 
 test-quality: test-flake8 test-isort
 
 test: build-image test-quality
 	$(DOCKER) run \
-	    -i $(FLAG_TEAMCITY_VERSION) \
+	    -i \
 	    $(DOCKER_TEST_ARGS) \
 	    --rm \
 	    $(TMP_IMAGE_NAME) \
 	    $(TEST_CMD)
 
 pre-commit-test:
-	$(DOCKER) run $(DOCKER_TEST_ARGS) -i $(FLAG_TEAMCITY_VERSION) -e FORCE_COLOR=true --rm \
+	$(DOCKER) run $(DOCKER_TEST_ARGS) -i -e FORCE_COLOR=true --rm \
 		-v $(shell pwd)/app/$(MAIN_DIR)/:/app/$(MAIN_DIR)/ $(TMP_IMAGE_NAME) \
 		sh -c "flake8 $(MAIN_DIR) --max-complexity 10 || /bin/true ; isort -rc $(MAIN_DIR)  -c  --diff"
 
