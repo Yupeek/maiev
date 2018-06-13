@@ -26,14 +26,16 @@ python:
 - "3.6"
 
 env:
-  secure: "D65G5vbWUbGpfTrfJa5hSu1ENb708DiAtfbUjhS4sOydrIQJR0gt4LN+EYPwaFgM45LvCnD1esATuHxSSqzmMpm94qfH8otH0n0End/ta4jE7EaEtNZ7ppDyrRKNYFBb10g+xYC+isTKeYZJ6UVpHpYyk5xXAIl5/VKsdvs43FM5v6JKUUaBYnrHkWAmuk5+A3j4OpnEQev+9rU+3OOioaxFWbxkk5tyTy1WujhCURAzvFWlX7fG9PykxhxGufncQgnHoROfZzar7eR5UNETffqDD1PMma8M9fL0numR6ZMZ7T1J20qc2zeVF0ERz5n299bxb+//rnG3YkzhLWpQmtN2bL+9x2qiVySxu+kv1J7bwljSryIiGNjNv00wlYu308dAwJh+11FW5cjkxh1lLCik7qrVKwgh9bo3S031pjcUIbhIe5XGLjfNXAVhaF9+K/o+EISCAFtns/R72vjG+gOVx0Q9+870R16LDYNW4Dqn5+nSFxbqgHeickPMz2HVJZFelAO4nQYNNbfipe+/dK9m8uH2byQ/RFK62+7DaYxJ/k8kfmsWpBjU82RK5A0TgKgl9F5sbDW0EmJSCBadrxHoVbjWMiSNk24XNOZ3Qgdfm17qqZBwfctjpvqB8RdXl2Cb+L8JIIxRAJ0ObUla9SiGxXUF3w9bmo6rwPkfE74="
+- secure: "D65G5vbWUbGpfTrfJa5hSu1ENb708DiAtfbUjhS4sOydrIQJR0gt4LN+EYPwaFgM45LvCnD1esATuHxSSqzmMpm94qfH8otH0n0End/ta4jE7EaEtNZ7ppDyrRKNYFBb10g+xYC+isTKeYZJ6UVpHpYyk5xXAIl5/VKsdvs43FM5v6JKUUaBYnrHkWAmuk5+A3j4OpnEQev+9rU+3OOioaxFWbxkk5tyTy1WujhCURAzvFWlX7fG9PykxhxGufncQgnHoROfZzar7eR5UNETffqDD1PMma8M9fL0numR6ZMZ7T1J20qc2zeVF0ERz5n299bxb+//rnG3YkzhLWpQmtN2bL+9x2qiVySxu+kv1J7bwljSryIiGNjNv00wlYu308dAwJh+11FW5cjkxh1lLCik7qrVKwgh9bo3S031pjcUIbhIe5XGLjfNXAVhaF9+K/o+EISCAFtns/R72vjG+gOVx0Q9+870R16LDYNW4Dqn5+nSFxbqgHeickPMz2HVJZFelAO4nQYNNbfipe+/dK9m8uH2byQ/RFK62+7DaYxJ/k8kfmsWpBjU82RK5A0TgKgl9F5sbDW0EmJSCBadrxHoVbjWMiSNk24XNOZ3Qgdfm17qqZBwfctjpvqB8RdXl2Cb+L8JIIxRAJ0ObUla9SiGxXUF3w9bmo6rwPkfE74="
+- secure: "W7OB9JiGbFVjxEsuTXKE1s7V6R0nr5PS5kxiI2+zkNj0gCHB/GE1RcPxz3uTY4T45U4I8nROhk19MZ83oxeKBoYKxjndeFW2yLa2PCQl7ZOJExw2AqCQ4ljRiDtVFkikzmfLmPiZ+/XNtYW+kf/VhcRSnr8gQE2BxVlmRxtgqpVzXoFxPrgcMu+yKdqUjYbl/5qdsJymznt0/isV7nkq79dYetdp6OgtJXdK9FRYa4EZR9LNUqAL2T6Ow4QkvnmHZRCgwkWKMGdVb8ClWTrnrFvDSZZoBZWjUa2t8QXVGs8hpHbFQIilHToeKkbOFzS+SHugfwkGOEO387LJn9a2ejs3VBW2MZeE3OINg0+snIGxWCxhsLcdTIGChDaYJ0aPcVp1ARjNzgBy5vks9FuLDsXzU1rsVOBc2SHb+vpISxnlREOW18o0Ysu44b5E00tX+lI3embXKwpJUOXoRyacUvovFmPlotu8O9+QHfJpr3M4lIhyykPg7TjNubCpKBFGkY9IWwT1SFVFhih6gAhaB8OzhyW2uvDn4CvjLqYIschYPpHVNsMzxvEfy3j7QVz6G2+Yf+EmxNBJBsoai2ZIHCzbKzzzT/dZamPCmdUuv47uW/zXH66FOpdV1vAAGhfKXTyR3WSEeIYUNRMeNQQHp9xbkSV3740NDtkaAz9Y1WI="
 
 jobs:
   include:
+    - stage: pre-test
+      before_install: []
+      script: docker run -it --rm $image
     - stage: test
-      script: echo $ENC && /bin/false
-
-    - env: SERVICE=common/health_mongodb
+      env: SERVICE=common/health_mongodb
     - env: SERVICE=scaler/registry_docker
     - env: SERVICE=scaler/scaler_docker
     - env: SERVICE=overseer/dependency_solver
