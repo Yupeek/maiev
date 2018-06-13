@@ -178,7 +178,6 @@ class ScalerDocker(object):
                     'service': self.get(service_id=event['Actor']['ID']),
                     'attributes': event['Actor']['Attributes'],
                 })
-                pprint.pprint(event)
 
     # ####################################################
     #  RPC endpoints

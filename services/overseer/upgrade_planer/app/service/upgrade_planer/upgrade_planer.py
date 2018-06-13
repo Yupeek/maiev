@@ -3,6 +3,7 @@ import copy
 import datetime
 import logging
 from collections import namedtuple
+from copy import deepcopy
 from pprint import pprint
 
 import pymongo
@@ -189,13 +190,6 @@ class UpgradePlaner(BaseWorkerService):
     :type: service.overseer.overseer.Overseer
     """
 
-    @once
-    @log_all
-    def lol(self):
-        import pprint
-        # pprint.pprint(self.explain_phase({"producer": "1.0.17", "consumer": "1.0.17"}))
-        pprint.pprint(self.resolve_upgrade_and_steps())
-
     # ####################################################
     #   ONCE
     # ####################################################
@@ -207,7 +201,7 @@ class UpgradePlaner(BaseWorkerService):
         do some check about the database to prevent problemes for resolution
         :return:
         """
-        for service in self.mongo.catalog.find():
+        for service in (self._unserialize_service(s) for s in self.mongo.catalog.find()):
             versions = service['versions']
             if not service['version'] in service['versions']:
                 logger.error(
@@ -247,7 +241,7 @@ class UpgradePlaner(BaseWorkerService):
             return
 
         service_name_ = payload['service']['name']
-        service = self.mongo.catalog.find_one({'name': service_name_})
+        service = self._unserialize_service(self.mongo.catalog.find_one({'name': service_name_}))
         version_ = payload['service']['image']['image_info']['version']
         if service:
             service['service'] = payload['service']
@@ -273,7 +267,7 @@ class UpgradePlaner(BaseWorkerService):
             }
         self.mongo.catalog.replace_one(
             {'name': service_name_},
-            service,
+            self._serialize_service(service),
             upsert=True
         )
 
@@ -299,9 +293,9 @@ class UpgradePlaner(BaseWorkerService):
         assert {'service', 'image', 'scale_config'} <= set(payload), "missing data in payload: %s" % str(set(payload))
 
         service_name_ = payload['service']['name']
-        service = self.mongo.catalog.find_one({
+        service = self._unserialize_service(self.mongo.catalog.find_one({
             "name": service_name_
-        })
+        }))
 
         version_number = payload['image']['version']
         image_info_ = payload['service']['image']['image_info']
@@ -327,7 +321,7 @@ class UpgradePlaner(BaseWorkerService):
 
         self.mongo.catalog.replace_one(
             {'name': service_name_},
-            service,
+            self._serialize_service(service),
             upsert=True
         )
         logger.debug("upserted %s => %r", service_name_, service)
@@ -357,7 +351,7 @@ class UpgradePlaner(BaseWorkerService):
     @log_all
     def list_catalog(self, filter_=None):
         filter_ = filter_ or {}
-        return [filter_dict(res) for res in self.mongo.catalog.find(filter_)]
+        return [self._unserialize_service(res) for res in self.mongo.catalog.find(filter_)]
 
     @rpc
     @log_all
@@ -457,7 +451,9 @@ class UpgradePlaner(BaseWorkerService):
 
     def _run_step(self, next_step, running_scheduled):
         # doing the upgrade from to
-        service_full_data = self.mongo.catalog.find_one({'service.name': next_step['service']})
+        service_full_data = self._unserialize_service(
+            self.mongo.catalog.find_one({'service.name': next_step['service']})
+        )
         if service_full_data is None:
             logger.error("we should upgrade %s %s=>%s but we can't find this service",
                          next_step['service'], next_step['from'], next_step['to'])
@@ -560,7 +556,7 @@ class UpgradePlaner(BaseWorkerService):
         else:
             filter_func = CATALOG_FILTERS[filter_name]
         res = []
-        for service in self.mongo.catalog.find():
+        for service in (self._unserialize_service(s) for s in self.mongo.catalog.find()):
             versions = {}
             res.append({
                 "name": service['name'],
@@ -589,7 +585,7 @@ class UpgradePlaner(BaseWorkerService):
                 for iv in sorted([ImageVersion.deserialize(vinfo['image_info']) for vinfo in s['versions'].values()],
                                  reverse=True)
             ]
-            for s in self.mongo.catalog.find()
+            for s in (self._unserialize_service(serv) for serv in self.mongo.catalog.find())
         }
         best_phase = None
         best_score = None
@@ -648,3 +644,31 @@ class UpgradePlaner(BaseWorkerService):
                     logger.debug("cant go to %s\n%s", tested_step, explain_phase)
 
         return backtrack([], current_phase, changed_service)
+
+    def _serialize_service(self, service):
+        """
+        change data in service to make it compatible for mongodb
+        :param service: dict
+        :return: dict
+        """
+        s = filter_dict(service)
+        s['versions_list'] = list(s['versions'].values())
+        del s['versions']
+        return s
+
+    def _unserialize_service(self, service_raw):
+        """
+        load the data from mongodb and return a python structured service
+        :param service_raw:
+        :return:
+        """
+        if service_raw is None:
+            return None
+        s = deepcopy(service_raw)
+        try:
+            s['versions'] = {v['version']: v for v in s['versions_list']}
+            del s['versions_list']
+        except KeyError:
+            pass
+
+        return s
