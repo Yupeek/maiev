@@ -47,7 +47,7 @@ jobs:
       script:
       - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
       - TARGET=latest make -C services/maiev-base build-image
-      - IMAGE_VERSION=build-${TRAVIS_BUILD_NUMBER} SERVICE_FORCE_PUSH=maiev-base make deploy
+      - IMAGE_VERSION=build-${TRAVIS_BUILD_NUMBER} SERVICE_FORCE_PUSH=maiev-base make deploy -C services/maiev-base
 
     # then we test all service with the previous built base image (pulled in before_install)
     - stage: test
