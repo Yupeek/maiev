@@ -199,8 +199,8 @@ class Solver(object):
         phase = []
         for service in self.catalog:
             if len(service['versions']) != 1:
-                raise Exception("you must provide only one version for service %s to explain this phase" %
-                                service['name'])
+                raise Exception("you must provide only one version for service %s to explain this phase. got %s" %
+                                (service['name'], list(service['versions'])))
             number, version = list(service['versions'].items())[0]
             if number in conditions.get(service['name'], {}):
                 phase.append((service, number, {
@@ -372,7 +372,7 @@ class DependencySolver(BaseWorkerService):
         except ScopeError as e:
             logger.exception("scope error")
             return {
-                "results": [],
+                "results": None,
                 "anomalies": s.anomalies,
                 "failed": s.failed,
                 "errors": [

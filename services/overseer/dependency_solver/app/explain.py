@@ -17,7 +17,8 @@ def get_formated_input():
         for k, v in input_.values():
             v['name'] = k
     elif not isinstance(input_, list):
-        return "input_ should be a list of scale.json"
+        raise Exception("input_ should be a list of scale.json")
+    return input_
 
 
 def explain_stdin():
@@ -47,12 +48,12 @@ def explain_stdin():
         })
 
     if not catalog:
-        return 'bad formated catalog'
+        raise Exception('bad formated catalog')
 
     s = Solver(catalog, (), debug=True)
     try:
         return {
-            "results": s.explain(),
+            "fail_count": s.explain(),
             "errors": [],
             "anomalies": s.anomalies,
             "failed": s.failed
@@ -60,7 +61,7 @@ def explain_stdin():
     except ScopeError as e:
         logger.exception("scope error")
         return {
-            "results": [],
+            "fail_count": None,
             "anomalies": s.anomalies,
             "failed": s.failed,
             "errors": [
@@ -72,4 +73,6 @@ def explain_stdin():
 
 
 if __name__ == '__main__':
-    print(json.dumps(explain_stdin()))
+    expl = explain_stdin()
+    print(json.dumps(expl))
+    sys.exit(0 if expl['fail_count'] == 0 else 1)

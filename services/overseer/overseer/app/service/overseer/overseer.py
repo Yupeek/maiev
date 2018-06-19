@@ -5,8 +5,9 @@ import pprint
 import time
 from functools import partial
 
+from nameko import timer
 from nameko.events import SERVICE_POOL, EventDispatcher, event_handler
-from nameko.exceptions import UnknownService
+from nameko.exceptions import RemoteError, UnknownService
 from nameko.rpc import RpcProxy, rpc
 from promise.promise import Promise
 
@@ -137,7 +138,7 @@ class Overseer(BaseWorkerService):
     reversed_type_to_scaler = {b: a for a, b in type_to_scaler.items()}
 
     # ####################################################
-    #                 EVENTS
+    #                 TIMER
     # ####################################################
 
     @event_handler(
@@ -214,6 +215,7 @@ class Overseer(BaseWorkerService):
         logger.debug("version found for this push : %s. searching for %s", image_version, image_version.image_id)
 
         for service in self._get_services(scaler_type=scaler_type, full_image_id=image_version.image_id):
+            logger.debug("getting image config for %s", image_version.unique_image_id)
             scale_config = self.scaler_docker.fetch_image_config(image_version.unique_image_id)
             logger.debug("will dispatch new event for service %s", service['name'])
             self.dispatch("new_image", {
@@ -234,8 +236,14 @@ class Overseer(BaseWorkerService):
             for scaler in self._get_scalers():
                 result = scaler.list_services()
                 for service in result:
-                    if 'rabbitmq' not in service['name']:
-                        self.monitor(scaler.type, service['name'])
+                    try:
+                        # we check if the service contains required config
+                        scale_config = self.scaler_docker.fetch_image_config(service['full_image_id'])
+                    except RemoteError:
+                        pass
+                    else:
+                        if scale_config:
+                            self.monitor(scaler.type, service['name'])
             logger.debug("services: %s", pprint.pformat(list(self.mongo.services.find()), indent=2, width=119))
 
     # ####################################################
@@ -287,7 +295,10 @@ class Overseer(BaseWorkerService):
             result,
             upsert=True,
         )
-        self.load_manager.monitor_service(result)
+        try:
+            self.load_manager.monitor_service.call_async(result)
+        except UnknownService:
+            logger.error("no load_manager running to catch monitoring request for %s", service_name)
         self.dispatch('service_updated', {"service": filter_dict(result), "diff": {}})
 
     @rpc
@@ -324,7 +335,7 @@ class Overseer(BaseWorkerService):
     @rpc
     @log_all
     def test(self):
-        s = self._get_services('docker', full_image_id='nginx')
+        s = self._get_services('docker', full_image_id='localhost:5000/maiev:producer')
         return [filter_dict(d) for d in s]
 
     @rpc

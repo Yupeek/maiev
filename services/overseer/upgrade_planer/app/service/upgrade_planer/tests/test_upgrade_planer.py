@@ -353,7 +353,7 @@ class TestStepComputing(object):
             {"name": "consumer", "version": "1.0.1"}
         ]
 
-        upgrade_planer.explain_phase = mock.Mock(return_value={'results': True})
+        upgrade_planer.explain_phase = mock.Mock(return_value={'results': 0})
         s = upgrade_planer.build_steps(goal)
         assert 2 == len(s)
         assert [('producer', '1.0.16', '1.0.17'), ('consumer', '1.0.1', '1.0.17')] == s
@@ -412,9 +412,9 @@ class TestStepComputing(object):
 
         def explain_phase(phase):
             if phase in compatible_phase or phase == goal_param:
-                return {'results': True}
+                return {'results': 0}
             else:
-                return {'results': []}
+                return {'results': 1}
 
         upgrade_planer.explain_phase = explain_phase
         s = upgrade_planer.build_steps(goal)
