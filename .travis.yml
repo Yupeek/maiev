@@ -12,14 +12,6 @@ before_install:
     # start mongodb
     - docker run -d --rm --name=maiev_mongodb -p 27017:27017 mongo
 
-
-addons:
-  apt_packages:
-    - libenchant-dev
-
-install:
-  - pip install tox
-
 cache:
   directories:
     - $HOME/.cache/pip
