@@ -5,6 +5,8 @@ services:
   - docker
 
 before_install:
+    - docker pull yupeek/maiev:maiev-base-build-${TRAVIS_BUILD_NUMBER}
+    - docker tag yupeek/maiev:maiev-base-build-${TRAVIS_BUILD_NUMBER} maiev-base:latest
     # start rabbitmq
     - docker run -d --hostname rabbitmq --name rabbitmq -p 15672:15672 -p 5672:5672 -e RABBITMQ_DEFAULT_USER=guest -e RABBITMQ_DEFAULT_PASS=guest rabbitmq:3.6.6-management
     # start mongodb
@@ -26,6 +28,7 @@ python:
 - "3.6"
 
 stages:
+  - base
   - test
   - global
   - staging
@@ -33,6 +36,16 @@ stages:
 
 jobs:
   include:
+    # first, we build the base image and we push it do the registry
+    - stage: base
+      env: *envvar
+      before_install: []
+      script:
+      - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+      - TARGET=latest make -C services/maiev-base build-image
+      - IMAGE_VERSION=build-${TRAVIS_BUILD_NUMBER} SERVICE_FORCE PUSH=maiev-base make deploy
+
+    # then we test all service with the previous built base image (pulled in before_install)
     - stage: test
       env: SERVICE=common/health_mongodb
     - env: SERVICE=scaler/registry_docker
@@ -43,12 +56,14 @@ jobs:
     - env: SERVICE=overseer/upgrade_planer
     - env: SERVICE=monitorer/monitorer_rabbitmq
     - env: SERVICE=monitorer/trigger
+
+    # we build the global image
     - stage: global
       script:
-      - TARGET=latest make -C services/maiev-base build-image
       - TARGET=global make build-image
       - make test -C global
 
+    # we deploy to docker-hub if the branch are develop.
     - stage: staging
       before_install: []
       env: &envvar
@@ -63,6 +78,8 @@ jobs:
         - make build-image
         - make deploy
       if: branch = develop
+
+    # we push to production if this is a master branch tagged
     - stage: production
       before_install: []
       env: *envvar
@@ -71,12 +88,12 @@ jobs:
         - TARGET=latest make -C services/maiev-base build-image
         - TARGET=global make build-image
         - make build-image
-        - IMAGE_VERSION=${TRAVIS_TAG}b make deploy
+        - IMAGE_VERSION=${TRAVIS_TAG} make deploy
         - IMAGE_VERSION=latest make deploy
       if: branch = master AND env(TRAVIS_TAG) IS present
 
 script:
-  - TARGET=latest make -C services/maiev-base build-image
+  - docker
   - make test -C services/$SERVICE
 
 
