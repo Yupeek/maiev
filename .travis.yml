@@ -1,5 +1,5 @@
 sudo: false
-language: python
+language: bash
 
 services:
   - docker
@@ -23,9 +23,6 @@ install:
 cache:
   directories:
     - $HOME/.cache/pip
-
-python:
-- "3.6"
 
 stages:
   - base
@@ -93,7 +90,6 @@ jobs:
       if: branch = master AND env(TRAVIS_TAG) IS present
 
 script:
-  - docker
   - make test -C services/$SERVICE
 
 
