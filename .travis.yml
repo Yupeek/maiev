@@ -79,6 +79,8 @@ jobs:
         - make build-image
         - IMAGE_VERSION=${TRAVIS_TAG} make deploy
         - IMAGE_VERSION=latest make deploy
+        - docker tag yupeek/maiev:global-latest yupeek/maiev:latest
+        - docker push yupeek/maiev:latest
       if: branch = master AND env(TRAVIS_TAG) IS present
 
 script:
