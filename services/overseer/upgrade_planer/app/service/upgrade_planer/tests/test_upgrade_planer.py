@@ -457,6 +457,47 @@ class TestSolveBestPhase(object):
         assert 0 == rank
         assert goal == Phase([PhasePin({"name": "producer", }, "1.0.17"), PhasePin({"name": "consumer", }, "1.0.17")])
 
+    def test_best_phase_beta_version(self, upgrade_planer: UpgradePlaner):
+        phases = [
+            Phase([PhasePin({"name": "producer", }, "1.0.1b"), PhasePin({"name": "consumer", }, "1.0.1b")]),
+            Phase([PhasePin({"name": "producer", }, "1.0.1b"), PhasePin({"name": "consumer", }, "1.0.17b")]),
+            Phase([PhasePin({"name": "producer", }, "1.0.16b"), PhasePin({"name": "consumer", }, "1.0.1b")]),
+            Phase([PhasePin({"name": "producer", }, "1.0.17b"), PhasePin({"name": "consumer", }, "1.0.1b")]),
+            Phase([PhasePin({"name": "producer", }, "1.0.17b"), PhasePin({"name": "consumer", }, "1.0.17b")]),
+        ]
+        upgrade_planer.mongo.catalog.find.return_value = [
+            {"name": "producer", "versions_list": self.build_catalog("producer", ["1.0.1b", "1.0.16b", "1.0.17b"])},
+            {"name": "consumer", "versions_list": self.build_catalog("consumer", ["1.0.1b", "1.0.17b"])},
+        ]
+
+        s = upgrade_planer.solve_best_phase(phases)
+        assert 2 == len(s)
+        goal, rank = s
+        assert 0 == rank
+        assert goal == Phase([PhasePin({"name": "producer", }, "1.0.17b"),
+                              PhasePin({"name": "consumer", }, "1.0.17b")])
+
+    def test_best_phase_rc_version(self, upgrade_planer: UpgradePlaner):
+        phases = [
+            Phase([PhasePin({"name": "producer", }, "1.0.1rc1"), PhasePin({"name": "consumer", }, "1.0.1rc1")]),
+            Phase([PhasePin({"name": "producer", }, "1.0.1rc1"), PhasePin({"name": "consumer", }, "1.0.1rc17")]),
+            Phase([PhasePin({"name": "producer", }, "1.0.1rc16"), PhasePin({"name": "consumer", }, "1.0.1rc1")]),
+            Phase([PhasePin({"name": "producer", }, "1.0.1rc17"), PhasePin({"name": "consumer", }, "1.0.1rc1")]),
+            Phase([PhasePin({"name": "producer", }, "1.0.1rc17"), PhasePin({"name": "consumer", }, "1.0.1rc17")]),
+        ]
+        upgrade_planer.mongo.catalog.find.return_value = [
+            {"name": "producer", "versions_list": self.build_catalog("producer",
+                                                                     ["1.0.1rc1", "1.0.1rc16", "1.0.1rc17"])},
+            {"name": "consumer", "versions_list": self.build_catalog("consumer", ["1.0.1rc1", "1.0.1rc17"])},
+        ]
+
+        s = upgrade_planer.solve_best_phase(phases)
+        assert 2 == len(s)
+        goal, rank = s
+        assert 0 == rank
+        assert goal == Phase([PhasePin({"name": "producer", }, "1.0.1rc17"),
+                              PhasePin({"name": "consumer", }, "1.0.1rc17")])
+
     def test_best_phase2(self, upgrade_planer: UpgradePlaner):
         phases = [
             [[{"name": "producer", }, "1.0.1"], [{"name": "consumer", }, "1.0.1"]],

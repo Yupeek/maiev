@@ -382,12 +382,16 @@ class UpgradePlaner(BaseWorkerService):
         """
         res = {}
         for service in (self._unserialize_service(serv) for serv in self.mongo.catalog.find()):
-            sorted_versions = list(sorted([
-                ImageVersion.deserialize(vinfo['image_info'])
-                for vinfo in service['versions'].values()
-            ], reverse=True))
+            sorted_versions = self.sort_versions(service['versions'].values())
             res[service['name']] = str(sorted_versions[0].version)
         return res
+
+    def sort_versions(self, versions):
+
+        sorted_version_metadata = list(sorted(
+            versions, reverse=True, key=lambda vinfo: ImageVersion.deserialize(vinfo['image_info'])))
+
+        return [v['version'] for v in sorted_version_metadata]
 
     @rpc
     @log_all
@@ -608,9 +612,8 @@ class UpgradePlaner(BaseWorkerService):
         """
         services = {
             s['name']: [
-                str(iv.version)
-                for iv in sorted([ImageVersion.deserialize(vinfo['image_info']) for vinfo in s['versions'].values()],
-                                 reverse=True)
+                iv
+                for iv in self.sort_versions(s['versions'].values())
             ]
             for s in (self._unserialize_service(serv) for serv in self.mongo.catalog.find())
         }
@@ -621,10 +624,14 @@ class UpgradePlaner(BaseWorkerService):
             score = 0
             for service, version in phase:
                 sorted_version = services[service['name']]
+
                 try:
-                    score += sorted_version.index(version)
+                    score += sorted_version.index(
+                        version
+                    )
                 except ValueError as ve:
                     logger.exception("%s not in service versions %s %s", version, service['name'], sorted_version)
+                    raise
             if best_score is None or best_score > score:
                 best_score, best_phase = score, phase
 
