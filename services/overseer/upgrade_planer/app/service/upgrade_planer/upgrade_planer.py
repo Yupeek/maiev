@@ -3,9 +3,11 @@ import copy
 import datetime
 import logging
 from collections import namedtuple
+from copy import deepcopy
 from pprint import pprint
 
 import pymongo
+from nameko import timer
 from nameko.events import SERVICE_POOL, EventDispatcher, event_handler
 from nameko.rpc import RpcProxy, rpc
 from semantic_version import Version
@@ -26,7 +28,7 @@ def accept_all(version, service):
 
 
 def no_downgrade(version, service):
-    return version['version'] >= service['version']
+    return version == 'latest' or Version.coerce(version['version']) >= Version.coerce(service['version'])
 
 
 def static_version(phase):
@@ -59,6 +61,8 @@ CATALOG_FILTERS = {
 }
 
 PhasePin = namedtuple('PhasePin', 'service,version')
+PhasePin.__repr__ = lambda self: "PhasePin(service={},version={}".format(
+    self.service.get('name', self.service), self.version)
 Step = namedtuple('Step', 'service,from_,to')
 
 
@@ -189,13 +193,6 @@ class UpgradePlaner(BaseWorkerService):
     :type: service.overseer.overseer.Overseer
     """
 
-    @once
-    @log_all
-    def lol(self):
-        import pprint
-        # pprint.pprint(self.explain_phase({"producer": "1.0.17", "consumer": "1.0.17"}))
-        pprint.pprint(self.resolve_upgrade_and_steps())
-
     # ####################################################
     #   ONCE
     # ####################################################
@@ -207,14 +204,27 @@ class UpgradePlaner(BaseWorkerService):
         do some check about the database to prevent problemes for resolution
         :return:
         """
-        for service in self.mongo.catalog.find():
+        for service in (self._unserialize_service(s) for s in self.mongo.catalog.find()):
             versions = service['versions']
             if not service['version'] in service['versions']:
                 logger.error(
                     "the service is fixed to a version which is not listed in available versions\n%s not in %s",
                     service['version'], versions
                 )
-                # TODO: call back overseer to get info about current version.
+                # call back overseer to get info about current version.
+                overseer_service = self.overseer.get_service(service['name'])
+                o_version_number = overseer_service['image']['image_info']['version']
+                scale_config_ = overseer_service['scale_config']
+                service['versions'][o_version_number] = {
+                    "version": o_version_number,
+                    "image_info": overseer_service['image']['image_info'],
+                    "dependencies": scale_config_.get('dependencies', {})
+                }
+                service['version'] = o_version_number
+                self._save_service(service)
+
+                logger.error("resolved previous error with call back to overseer: got version %s data",
+                             o_version_number)
 
     @once
     @log_all
@@ -242,12 +252,8 @@ class UpgradePlaner(BaseWorkerService):
         """
         assert {'service', 'diff'} <= set(payload), "missing data in payload: %s" % str(set(payload))
 
-        # we just handle finished changes
-        if payload['diff'].get('state', {}).get('to') != 'completed':
-            return
-
         service_name_ = payload['service']['name']
-        service = self.mongo.catalog.find_one({'name': service_name_})
+        service = self._get_service(service_name_)
         version_ = payload['service']['image']['image_info']['version']
         if service:
             service['service'] = payload['service']
@@ -271,11 +277,7 @@ class UpgradePlaner(BaseWorkerService):
                 },
                 "version": version_
             }
-        self.mongo.catalog.replace_one(
-            {'name': service_name_},
-            service,
-            upsert=True
-        )
+        self._save_service(service)
 
         self.mongo.phases.insert_one({
             "updated": service['name'],
@@ -288,7 +290,10 @@ class UpgradePlaner(BaseWorkerService):
             "date": datetime.datetime.now()
         })
 
-        self.continue_scheduled_plan(service, from_version, version_)
+        # we just handle finished changes: complited event or update of 0 replicas service
+        if payload['diff'].get('state', {}).get('to') == 'completed' or \
+                payload['service']['mode'] == {'name': 'replicated', 'replicas': 0}:
+            self.continue_scheduled_plan(service, from_version, version_)
 
     @event_handler(
         "overseer", "new_image", handler_type=SERVICE_POOL, reliable_delivery=True
@@ -299,9 +304,7 @@ class UpgradePlaner(BaseWorkerService):
         assert {'service', 'image', 'scale_config'} <= set(payload), "missing data in payload: %s" % str(set(payload))
 
         service_name_ = payload['service']['name']
-        service = self.mongo.catalog.find_one({
-            "name": service_name_
-        })
+        service = self._get_service(service_name_)
 
         version_number = payload['image']['version']
         image_info_ = payload['service']['image']['image_info']
@@ -325,11 +328,8 @@ class UpgradePlaner(BaseWorkerService):
             "dependencies": scale_config_.get('dependencies', {})
         }
 
-        self.mongo.catalog.replace_one(
-            {'name': service_name_},
-            service,
-            upsert=True
-        )
+        self._save_service(service)
+
         logger.debug("upserted %s => %r", service_name_, service)
         self.dispatch("new_version", {
             "service": filter_dict(service),
@@ -346,7 +346,7 @@ class UpgradePlaner(BaseWorkerService):
         :param payload:
         :return:
         """
-        logger.debug("new version for %s", payload['service']['name'])
+        logger.debug("new version for %s: %s", payload['service']['name'], payload['new']['version'])
         self.run_available_upgrade()
 
     # ############################################
@@ -357,7 +357,7 @@ class UpgradePlaner(BaseWorkerService):
     @log_all
     def list_catalog(self, filter_=None):
         filter_ = filter_ or {}
-        return [filter_dict(res) for res in self.mongo.catalog.find(filter_)]
+        return [filter_dict(self._unserialize_service(res)) for res in self.mongo.catalog.find(filter_)]
 
     @rpc
     @log_all
@@ -370,6 +370,28 @@ class UpgradePlaner(BaseWorkerService):
 
         catalog = self.build_catalog(static_version(phase))
         return self.dependency_solver.explain(catalog)
+
+    @rpc
+    @log_all
+    def get_latest_phase(self):
+        """
+        return the latest phase for registered version of all services.
+        this don't mean this phase is compatible.
+        :return: all service with their latest versions
+        :rtype: dict[str, str]
+        """
+        res = {}
+        for service in (self._unserialize_service(serv) for serv in self.mongo.catalog.find()):
+            sorted_versions = self.sort_versions(service['versions'].values())
+            res[service['name']] = str(sorted_versions[0].version)
+        return res
+
+    def sort_versions(self, versions):
+
+        sorted_version_metadata = list(sorted(
+            versions, reverse=True, key=lambda vinfo: ImageVersion.deserialize(vinfo['image_info'])))
+
+        return [v['version'] for v in sorted_version_metadata]
 
     @rpc
     @log_all
@@ -402,6 +424,8 @@ class UpgradePlaner(BaseWorkerService):
                 ]
             }
             self._run_step(sched['steps'][0], sched)
+            # disable all scheduled
+            self.mongo.scheduling.update_many({"state": RUNNING}, {"$set": {"state": ABORDED}})
             self.mongo.scheduling.insert_one(sched)
             return filter_dict(sched)
         return None
@@ -455,32 +479,12 @@ class UpgradePlaner(BaseWorkerService):
 
         self.mongo.scheduling.replace_one({'_id': running_scheduled['_id']}, running_scheduled)
 
-    def _run_step(self, next_step, running_scheduled):
-        # doing the upgrade from to
-        service_full_data = self.mongo.catalog.find_one({'service.name': next_step['service']})
-        if service_full_data is None:
-            logger.error("we should upgrade %s %s=>%s but we can't find this service",
-                         next_step['service'], next_step['from'], next_step['to'])
-            _abord_scheduled(running_scheduled)
-        elif next_step['to'] not in service_full_data['versions']:
-            logger.error("we should upgrade %s %s=>%s but we can't find this version in the catalog.",
-                         next_step['service'], next_step['from'], next_step['to'])
-            _abord_scheduled(running_scheduled)
-        else:
-            # now, we ask overseer to upgrade te given service to the expected version.
-            # whene this is done, we will be notified by another overseer.service_updated signal
-            next_step['state'] = RUNNING
-            logger.debug("ask overseer to switch %s to image : %s",
-                         service_full_data['name'],
-                         service_full_data['versions'][next_step['to']]['image_info'])
-            self.overseer.upgrade_service(service_full_data['name'],
-                                          service_full_data['versions'][next_step['to']]['image_info'])
-
     @rpc
     @log_all
     def resolve_upgrade_and_steps(self):
         """
-        resolve the best phase for current catalog and build the steps to got to it
+        resolve the best phase for current catalog and build the steps to got to it.
+        this is a dry-run process that will not run any upgrade
         :return: the dict with the result and the errors::
 
             result:
@@ -508,7 +512,9 @@ class UpgradePlaner(BaseWorkerService):
                 }
             }
         phases = [Phase.deserialize(phase) for phase in solved_phases['results']]
-        goal, note = self.solve_best_phase(phases)  # type: Phase[PhasePin], int
+        logger.debug("resolved phases : %s", phases)
+        goal, rank = self.solve_best_phase(phases)  # type: Phase[PhasePin], int
+        logger.debug("goal phase ranked %d: %s", rank, goal)
         """
         goal is the best noted phase given by all compatible phases.
         """
@@ -541,6 +547,27 @@ class UpgradePlaner(BaseWorkerService):
     # private methodes
     # ################################################
 
+    def _run_step(self, next_step, running_scheduled):
+        # doing the upgrade from to
+        service_full_data = self._get_service(next_step['service'])
+        if service_full_data is None:
+            logger.error("we should upgrade %s %s=>%s but we can't find this service",
+                         next_step['service'], next_step['from'], next_step['to'])
+            _abord_scheduled(running_scheduled)
+        elif next_step['to'] not in service_full_data['versions']:
+            logger.error("we should upgrade %s %s=>%s but we can't find this version in the catalog.",
+                         next_step['service'], next_step['from'], next_step['to'])
+            _abord_scheduled(running_scheduled)
+        else:
+            # now, we ask overseer to upgrade te given service to the expected version.
+            # whene this is done, we will be notified by another overseer.service_updated signal
+            next_step['state'] = RUNNING
+            logger.debug("ask overseer to switch %s to image : %s",
+                         service_full_data['name'],
+                         service_full_data['versions'][next_step['to']]['image_info'])
+            self.overseer.upgrade_service(service_full_data['name'],
+                                          service_full_data['versions'][next_step['to']]['image_info'])
+
     def build_catalog(self, filter_name=NO_DOWNGRADE):
         """
         read the catalog from mongodb and return the catalog formated to be readable from dependency_solver
@@ -560,7 +587,7 @@ class UpgradePlaner(BaseWorkerService):
         else:
             filter_func = CATALOG_FILTERS[filter_name]
         res = []
-        for service in self.mongo.catalog.find():
+        for service in (self._unserialize_service(s) for s in self.mongo.catalog.find()):
             versions = {}
             res.append({
                 "name": service['name'],
@@ -585,11 +612,10 @@ class UpgradePlaner(BaseWorkerService):
         """
         services = {
             s['name']: [
-                str(iv.version)
-                for iv in sorted([ImageVersion.deserialize(vinfo['image_info']) for vinfo in s['versions'].values()],
-                                 reverse=True)
+                iv
+                for iv in self.sort_versions(s['versions'].values())
             ]
-            for s in self.mongo.catalog.find()
+            for s in (self._unserialize_service(serv) for serv in self.mongo.catalog.find())
         }
         best_phase = None
         best_score = None
@@ -598,10 +624,14 @@ class UpgradePlaner(BaseWorkerService):
             score = 0
             for service, version in phase:
                 sorted_version = services[service['name']]
+
                 try:
-                    score += sorted_version.index(version)
+                    score += sorted_version.index(
+                        version
+                    )
                 except ValueError as ve:
                     logger.exception("%s not in service versions %s %s", version, service['name'], sorted_version)
+                    raise
             if best_score is None or best_score > score:
                 best_score, best_phase = score, phase
 
@@ -639,7 +669,7 @@ class UpgradePlaner(BaseWorkerService):
                 tested_step[service] = to_
                 logger.debug("try if it's possible : %s" % (tested_step))
                 explain_phase = self.explain_phase(tested_step)
-                if explain_phase['results']:
+                if explain_phase['results'] == 0:  # mean 0 error for this phase
                     solution = backtrack(steps + [Step(service, from_, to_)], tested_step,
                                          [r for r in rest if r[0] != service])
                     if solution is not None:
@@ -648,3 +678,50 @@ class UpgradePlaner(BaseWorkerService):
                     logger.debug("cant go to %s\n%s", tested_step, explain_phase)
 
         return backtrack([], current_phase, changed_service)
+
+    def _serialize_service(self, service):
+        """
+        change data in service to make it compatible for mongodb
+        :param service: dict
+        :return: dict
+        """
+        s = filter_dict(service)
+        s['versions_list'] = list(s['versions'].values())
+        del s['versions']
+        return s
+
+    def _unserialize_service(self, service_raw):
+        """
+        load the data from mongodb and return a python structured service
+        :param service_raw:
+        :return:
+        """
+        if service_raw is None:
+            return None
+        s = deepcopy(service_raw)
+        try:
+            s['versions'] = {v['version']: v for v in s['versions_list']}
+            del s['versions_list']
+        except KeyError:
+            pass
+        return s
+
+    def _get_service(self, service_name):
+        """
+        load from the database the given service
+        :param service_name: the name of the service
+        :return:
+        """
+        return self._unserialize_service(self.mongo.catalog.find_one({'name': service_name}))
+
+    def _save_service(self, service):
+        """
+        save in the database the given service. replace existing entry if name match.
+        :param service: the Service
+        :return:
+        """
+        self.mongo.catalog.replace_one(
+            {'name': service['name']},
+            self._serialize_service(service),
+            upsert=True
+        )

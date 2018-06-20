@@ -1,3 +1,4 @@
+#!/bin/env python
 # -*- coding: utf-8 -*-
 
 import logging
@@ -174,8 +175,48 @@ class Solver(object):
                     if number in conditions.get(service['name'], {})
                 })
             )
+        encountered_solutions = [
+        ]
+        for solution in self.backtrack(variables, [self.check_requirements, self.check_extra_constraints], []):
+            pined = {
+                pin[0]['name']: pin[1]
+                for pin in solution
+            }
+            if pined in encountered_solutions:
+                continue
+            encountered_solutions.append(pined)
+            yield solution
 
-        yield from self.backtrack(variables, [self.check_requirements, self.check_extra_constraints], [])
+    def explain(self):
+        """
+        just render one solution with all version at once
+        catalog must be provided with only one version for all services.
+        :return:
+        """
+        symbol_table = self.compile_symbole_table()
+        conditions = self.compile_conditions(symbol_table)
+
+        phase = []
+        for service in self.catalog:
+            if len(service['versions']) != 1:
+                raise Exception("you must provide only one version for service %s to explain this phase. got %s" %
+                                (service['name'], list(service['versions'])))
+            number, version = list(service['versions'].items())[0]
+            if number in conditions.get(service['name'], {}):
+                phase.append((service, number, {
+                    "provide": version['provide'],
+                    "require": conditions[service['name']][number]
+                }))
+
+        failed = 0
+
+        for remaining_service, _, version in phase:
+
+            for c in (self.check_requirements, self.check_extra_constraints):
+                if not c(remaining_service, version, [s[:2] for s in phase]):
+                    failed += 1
+
+        return failed
 
     def check_requirements(self, service, version, tmpsolution):
         """
@@ -186,14 +227,30 @@ class Solver(object):
         :return:
         """
         provided = self.build_provided(tmpsolution)
+        require = None
         try:
 
             for require in version['require']:
                 if not require(provided):
                     if self.debug:
-                        self.failed.append((require.original_string, provided))
+                        self.failed.append({
+                            "expression": require.original_string,
+                            "service": service['name'],
+                            "provided": provided
+                        })
                     return False
         except (ScopeError, KeyError) as e:
+            if self.debug:
+                self.failed.append({
+                    "expression": require.original_string,
+                    "service": service['name'],
+                    "provided": provided
+                })
+                self.anomalies.append({
+                    "expression": require.original_string,
+                    "service": service['name'],
+                    "error": repr(e)
+                })
             return False
         else:
             return True
@@ -229,8 +286,8 @@ class Solver(object):
     def backtrack(self, remaining_services, constraints, tmp_solution):
         if len(remaining_services) == 0:
             yield tmp_solution
-        else:
-            remaining_service, versions = remaining_services[0]
+        for i, (remaining_service, versions) in enumerate(remaining_services):
+
             for version_num, version in sorted(versions.items(), reverse=True):
                 for c in constraints:
                     if not c(remaining_service, version, tmp_solution):
@@ -238,7 +295,7 @@ class Solver(object):
                 else:
                     # all check passed
                     yield from self.backtrack(
-                        remaining_services[1:],
+                        remaining_services[:i] + remaining_services[i + 1:],
                         constraints,
                         tmp_solution + [(remaining_service, version_num)]
                     )
@@ -274,7 +331,8 @@ class DependencySolver(BaseWorkerService):
                                           "'name' in myservice:rpc:hello:args"]
 
         :param list extra_constraints: list of extra constraints if required (same form as service's require)
-        :return: all possibles versions folowing the given constraints
+        :return: all possibles versions folowing the given constraints.
+        :rtype:   list of tuple with [0]=service data , [1]=version
         """
         try:
             s = Solver(catalog, extra_constraints)
@@ -306,7 +364,7 @@ class DependencySolver(BaseWorkerService):
         s = Solver(catalog, extra_constraints, debug=True)
         try:
             return {
-                "results": list(s.solve()),
+                "results": s.explain(),
                 "errors": [],
                 "anomalies": s.anomalies,
                 "failed": s.failed
@@ -314,7 +372,7 @@ class DependencySolver(BaseWorkerService):
         except ScopeError as e:
             logger.exception("scope error")
             return {
-                "results": [],
+                "results": None,
                 "anomalies": s.anomalies,
                 "failed": s.failed,
                 "errors": [

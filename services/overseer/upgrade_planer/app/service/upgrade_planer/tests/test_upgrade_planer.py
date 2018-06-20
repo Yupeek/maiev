@@ -138,20 +138,19 @@ class TestUpgradePlaner(object):
         upgrade_planer.mongo.catalog.find_one.return_value = {
             "name": "producer",
             "service": event_payload['service'],
-            "versions": {
-                "1.0.1": {
-                    "version": "1.0.1",
-                    "dependencies": event_payload['scale_config']['dependencies'],
-                    "image_info": {
-                        'digest': 'sha256:d2a8219e9b3bdc4da656d32c4ac9ad4e54312946a10ac9244967d4373bc3ce6d',
-                        'image': 'maiev',
-                        'repository': 'localhost:5000',
-                        'species': 'producer',
-                        'tag': 'producer-1.0.1',
-                        'version': '1.0.1'
-                    },
-                }
-            },
+            "versions_list": [{
+                "version": "1.0.1",
+                "dependencies": event_payload['scale_config']['dependencies'],
+                "image_info": {
+                    'digest': 'sha256:d2a8219e9b3bdc4da656d32c4ac9ad4e54312946a10ac9244967d4373bc3ce6d',
+                    'image': 'maiev',
+                    'repository': 'localhost:5000',
+                    'species': 'producer',
+                    'tag': 'producer-1.0.1',
+                    'version': '1.0.1'
+                },
+            }
+            ],
         }
         upgrade_planer.on_new_version(event_payload)
         upgrade_planer.dispatch.assert_not_called()
@@ -160,20 +159,18 @@ class TestUpgradePlaner(object):
         upgrade_planer.mongo.catalog.find_one.return_value = {
             "name": "producer",
             "service": event_payload['service'],
-            "versions": {
-                "1.0.0": {
-                    "version": "1.0.0",
-                    "dependencies": {},
-                    "image_info": {
-                        'digest': 'sha256:d2a8219e9b3bdc4da656d32c4ac9ad4e54312946a10ac9244967d4373bc3ce6d',
-                        'image': 'maiev',
-                        'repository': 'localhost:5000',
-                        'species': 'producer',
-                        'tag': 'producer-1.0.0',
-                        'version': '1.0.0'
-                    },
-                }
-            },
+            "versions_list": [{
+                "version": "1.0.0",
+                "dependencies": {},
+                "image_info": {
+                    'digest': 'sha256:d2a8219e9b3bdc4da656d32c4ac9ad4e54312946a10ac9244967d4373bc3ce6d',
+                    'image': 'maiev',
+                    'repository': 'localhost:5000',
+                    'species': 'producer',
+                    'tag': 'producer-1.0.0',
+                    'version': '1.0.0'
+                },
+            }],
         }
         upgrade_planer.on_new_version(event_payload)
         new_version = {"version": "1.0.1",
@@ -216,23 +213,23 @@ class TestUpgradePlaner(object):
         upgrade_planer.mongo.catalog.find.return_value = [{
             "name": "consumer",
             "service": service['consumer'],
-            "versions": {
-                "1.0.16": {"version": "1.0.16", "dependencies": {
+            "versions_list": [
+                {"version": "1.0.16", "dependencies": {
                     "require": [
                         "producer:rpc:echo"
                     ]
-                }}
-            },
+                }}],
+
             "version": service['consumer']['image']['image_info']['version'],
         }, {
             "name": "producer",
             "service": service['producer'],
-            "versions": {
-                "1.0.16": {"version": "1.0.16", "dependencies": {
+            "versions_list": [
+                {"version": "1.0.16", "dependencies": {
                     "provide": {
                         "producer:rpc:echo": 1
                     }}}
-            },
+            ],
             "version": service['producer']['image']['image_info']['version'],
 
         }
@@ -261,27 +258,78 @@ class TestUpgradePlaner(object):
             }
         ]
 
+    def test_build_catalog_beta_versions(self, upgrade_planer: UpgradePlaner, service):
+        service['consumer']['image']['image_info']['version'] = '1.0.16b'
+        service['producer']['image']['image_info']['version'] = '1.0.16b'
+        upgrade_planer.mongo.catalog.find.return_value = [{
+            "name": "consumer",
+            "service": service['consumer'],
+            "versions_list": [
+                {"version": "1.0.16b", "dependencies": {
+                    "require": [
+                        "producer:rpc:echo"
+                    ]
+                }}],
+
+            "version": service['consumer']['image']['image_info']['version'],
+        }, {
+            "name": "producer",
+            "service": service['producer'],
+            "versions_list": [
+                {"version": "1.0.16b", "dependencies": {
+                    "provide": {
+                        "producer:rpc:echo": 1
+                    }}}
+            ],
+            "version": service['producer']['image']['image_info']['version'],
+
+        }
+        ]
+        c = upgrade_planer.build_catalog()
+        assert c == [
+            {
+                "name": "consumer",
+                "versions": {
+                    "1.0.16b": {
+                        "provide": {},
+                        "require": ["producer:rpc:echo"]
+                    },
+                }
+            },
+            {
+                "name": "producer",
+                "versions": {
+                    "1.0.16b": {
+                        "provide": {
+                            "producer:rpc:echo": 1
+                        },
+                        "require": []
+                    },
+                }
+            }
+        ]
+
     def test_build_catalog_no_solution(self, upgrade_planer: UpgradePlaner, service):
         upgrade_planer.mongo.catalog.find.return_value = [{
             "name": "consumer",
             "service": service['consumer'],
-            "versions": {
-                "1.0.15": {"version": "1.0.15", "dependencies": {
+            "versions_list": [
+                {"version": "1.0.15", "dependencies": {
                     "require": [
                         "producer:rpc:echo"
                     ]
                 }}
-            },
+            ],
             "version": service['consumer']['image']['image_info']['version']
         }, {
             "name": "producer",
             "service": service['producer'],
-            "versions": {
-                "1.0.15": {"version": "1.0.15", "dependencies": {
+            "versions_list": [
+                {"version": "1.0.15", "dependencies": {
                     "provide": {
                         "producer:rpc:echo": 1
                     }}}
-            },
+            ],
             "version": service['producer']['image']['image_info']['version'],
         }
         ]
@@ -301,23 +349,23 @@ class TestUpgradePlaner(object):
         upgrade_planer.mongo.catalog.find.return_value = [{
             "name": "consumer",
             "service": service['consumer'],
-            "versions": {
-                "1.0.15": {"version": "1.0.15", "dependencies": {
+            "versions_list": [
+                {"version": "1.0.15", "dependencies": {
                     "require": [
                         "producer:rpc:echo"
                     ]
                 }}
-            },
+            ],
             "version": service['consumer']['image']['image_info']['version'],
         }, {
             "name": "producer",
             "service": service['producer'],
-            "versions": {
-                "1.0.15": {"version": "1.0.15", "dependencies": {
+            "versions_list": [
+                {"version": "1.0.15", "dependencies": {
                     "provide": {
                         "producer:rpc:echo": 1
                     }}}
-            },
+            ],
             "version": service['producer']['image']['image_info']['version'],
 
         }
@@ -356,7 +404,7 @@ class TestStepComputing(object):
             {"name": "consumer", "version": "1.0.1"}
         ]
 
-        upgrade_planer.explain_phase = mock.Mock(return_value={'results': True})
+        upgrade_planer.explain_phase = mock.Mock(return_value={'results': 0})
         s = upgrade_planer.build_steps(goal)
         assert 2 == len(s)
         assert [('producer', '1.0.16', '1.0.17'), ('consumer', '1.0.1', '1.0.17')] == s
@@ -415,9 +463,9 @@ class TestStepComputing(object):
 
         def explain_phase(phase):
             if phase in compatible_phase or phase == goal_param:
-                return {'results': True}
+                return {'results': 0}
             else:
-                return {'results': []}
+                return {'results': 1}
 
         upgrade_planer.explain_phase = explain_phase
         s = upgrade_planer.build_steps(goal)
@@ -427,7 +475,7 @@ class TestStepComputing(object):
 class TestSolveBestPhase(object):
 
     def build_catalog(self, service, versions):
-        return {v: {
+        return [{
             "version": v,
             "image_info": {
                 'digest': 'sha256:d2a8219e9b3bdc4da656d32c4ac9ad4e54312946a10ac9244967d4373bc3ce6d',
@@ -439,7 +487,7 @@ class TestSolveBestPhase(object):
             },
         }
             for v in versions
-        }
+        ]
 
     def test_best_phase(self, upgrade_planer: UpgradePlaner):
         phases = [
@@ -450,8 +498,8 @@ class TestSolveBestPhase(object):
             Phase([PhasePin({"name": "producer", }, "1.0.17"), PhasePin({"name": "consumer", }, "1.0.17")]),
         ]
         upgrade_planer.mongo.catalog.find.return_value = [
-            {"name": "producer", "versions": self.build_catalog("producer", ["1.0.1", "1.0.16", "1.0.17"])},
-            {"name": "consumer", "versions": self.build_catalog("consumer", ["1.0.1", "1.0.17"])},
+            {"name": "producer", "versions_list": self.build_catalog("producer", ["1.0.1", "1.0.16", "1.0.17"])},
+            {"name": "consumer", "versions_list": self.build_catalog("consumer", ["1.0.1", "1.0.17"])},
         ]
 
         s = upgrade_planer.solve_best_phase(phases)
@@ -459,6 +507,47 @@ class TestSolveBestPhase(object):
         goal, rank = s
         assert 0 == rank
         assert goal == Phase([PhasePin({"name": "producer", }, "1.0.17"), PhasePin({"name": "consumer", }, "1.0.17")])
+
+    def test_best_phase_beta_version(self, upgrade_planer: UpgradePlaner):
+        phases = [
+            Phase([PhasePin({"name": "producer", }, "1.0.1b"), PhasePin({"name": "consumer", }, "1.0.1b")]),
+            Phase([PhasePin({"name": "producer", }, "1.0.1b"), PhasePin({"name": "consumer", }, "1.0.17b")]),
+            Phase([PhasePin({"name": "producer", }, "1.0.16b"), PhasePin({"name": "consumer", }, "1.0.1b")]),
+            Phase([PhasePin({"name": "producer", }, "1.0.17b"), PhasePin({"name": "consumer", }, "1.0.1b")]),
+            Phase([PhasePin({"name": "producer", }, "1.0.17b"), PhasePin({"name": "consumer", }, "1.0.17b")]),
+        ]
+        upgrade_planer.mongo.catalog.find.return_value = [
+            {"name": "producer", "versions_list": self.build_catalog("producer", ["1.0.1b", "1.0.16b", "1.0.17b"])},
+            {"name": "consumer", "versions_list": self.build_catalog("consumer", ["1.0.1b", "1.0.17b"])},
+        ]
+
+        s = upgrade_planer.solve_best_phase(phases)
+        assert 2 == len(s)
+        goal, rank = s
+        assert 0 == rank
+        assert goal == Phase([PhasePin({"name": "producer", }, "1.0.17b"),
+                              PhasePin({"name": "consumer", }, "1.0.17b")])
+
+    def test_best_phase_rc_version(self, upgrade_planer: UpgradePlaner):
+        phases = [
+            Phase([PhasePin({"name": "producer", }, "1.0.1rc1"), PhasePin({"name": "consumer", }, "1.0.1rc1")]),
+            Phase([PhasePin({"name": "producer", }, "1.0.1rc1"), PhasePin({"name": "consumer", }, "1.0.1rc17")]),
+            Phase([PhasePin({"name": "producer", }, "1.0.1rc16"), PhasePin({"name": "consumer", }, "1.0.1rc1")]),
+            Phase([PhasePin({"name": "producer", }, "1.0.1rc17"), PhasePin({"name": "consumer", }, "1.0.1rc1")]),
+            Phase([PhasePin({"name": "producer", }, "1.0.1rc17"), PhasePin({"name": "consumer", }, "1.0.1rc17")]),
+        ]
+        upgrade_planer.mongo.catalog.find.return_value = [
+            {"name": "producer", "versions_list": self.build_catalog("producer",
+                                                                     ["1.0.1rc1", "1.0.1rc16", "1.0.1rc17"])},
+            {"name": "consumer", "versions_list": self.build_catalog("consumer", ["1.0.1rc1", "1.0.1rc17"])},
+        ]
+
+        s = upgrade_planer.solve_best_phase(phases)
+        assert 2 == len(s)
+        goal, rank = s
+        assert 0 == rank
+        assert goal == Phase([PhasePin({"name": "producer", }, "1.0.1rc17"),
+                              PhasePin({"name": "consumer", }, "1.0.1rc17")])
 
     def test_best_phase2(self, upgrade_planer: UpgradePlaner):
         phases = [
@@ -468,8 +557,8 @@ class TestSolveBestPhase(object):
             [[{"name": "producer", }, "1.0.17"], [{"name": "consumer", }, "1.0.1"]],
         ]
         upgrade_planer.mongo.catalog.find.return_value = [
-            {"name": "producer", "versions": self.build_catalog("producer", ["1.0.1", "1.0.16", "1.0.17"])},
-            {"name": "consumer", "versions": self.build_catalog("consumer", ["1.0.1", "1.0.17"])},
+            {"name": "producer", "versions_list": self.build_catalog("producer", ["1.0.1", "1.0.16", "1.0.17"])},
+            {"name": "consumer", "versions_list": self.build_catalog("consumer", ["1.0.1", "1.0.17"])},
         ]
 
         s = upgrade_planer.solve_best_phase(phases)
@@ -485,8 +574,8 @@ class TestSolveBestPhase(object):
             [[{"name": "producer", }, "1.0.16"], [{"name": "consumer", }, "1.0.1"]],
         ]
         upgrade_planer.mongo.catalog.find.return_value = [
-            {"name": "producer", "versions": self.build_catalog("producer", ["1.0.1", "1.0.16", "1.0.17"])},
-            {"name": "consumer", "versions": self.build_catalog("consumer", ["1.0.1", "1.0.17"])},
+            {"name": "producer", "versions_list": self.build_catalog("producer", ["1.0.1", "1.0.16", "1.0.17"])},
+            {"name": "consumer", "versions_list": self.build_catalog("consumer", ["1.0.1", "1.0.17"])},
         ]
 
         s = upgrade_planer.solve_best_phase(phases)

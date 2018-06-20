@@ -92,7 +92,7 @@ d__registry__list() {
 		# no https
 		if [ $? = 35 ]
 		then
-			curl -s -H "Accept: application/json" \
+			curl -s -H "Authorization: $AUTH" -H "Accept: application/json" \
 			"http://$host/v2/$image/tags/list"
 		fi
 	fi
