@@ -41,7 +41,7 @@ def log_all(meth_or_ignore_excpt=None, ignore_exceptions=(SystemExit,)):
 def make_promise(result_async):
     def promise_caller(resolve, reject):
         def promise_waiter():
-            resolve(result_async.result())  # will wait for rcp reply
+            resolve(result_async.result())  # will wait for rpc reply
 
         eventlet.spawn(promise_waiter)
 

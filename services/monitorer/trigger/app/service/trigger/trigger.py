@@ -138,7 +138,7 @@ class Trigger(BaseWorkerService):
 
     - monitorer_rabbitmq.metirc_update(metrics: dict)
 
-    rcp
+    rpc
     ###
 
     compute(Ruleset, values)

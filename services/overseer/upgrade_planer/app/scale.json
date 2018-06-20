@@ -3,30 +3,31 @@
   "max": 10,
   "dependencies": {
     "require": [
+      "dependency_solver:rpc:explain > 0",
+      "dependency_solver:rpc:solve_dependencies > 0",
+      "overseer:rpc:get_service > 0",
+      "overseer:rpc:upgrade_service > 0",
+      "overseer:event:service_updated > 0",
+      "overseer:event:new_image > 0"
     ],
     "provide": {
-
-    },
-    "optional": [
-    ]
-  },
-  "metric": [
-  ],
-  "envs": [
-    {
-      "name": "My_ENV",
-      "type": "string",
-      "required": true,
-      "default": "this is default",
-      "description": "some env"
+      "upgrade_planer:event:new_version": 1,
+      "upgrade_planer:rpc:list_catalog": 1,
+      "upgrade_planer:rpc:explain_phase": 1,
+      "upgrade_planer:rpc:get_latest_phase": 1,
+      "upgrade_planer:rpc:run_available_upgrade": 1,
+      "upgrade_planer:rpc:continue_scheduled_plan": 1,
+      "upgrade_planer:rpc:resolve_upgrade_and_steps": 1
     }
+  },
+  "envs": [
   ],
   "scale": {
     "resources": [
       {
         "name": "rmq",
         "monitorer": "monitorer_rabbitmq",
-        "identifier": "rpc-overseer_upgrade_planer"
+        "identifier": "rpc-upgrade_planer"
       }
     ],
     "rules": [

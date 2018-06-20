@@ -112,7 +112,7 @@ class ScalerDocker(object):
 
     None
 
-    rcp
+    rpc
     ###
 
     fetch_image_config(image_name: str): ScaleConfig

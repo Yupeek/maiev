@@ -111,7 +111,7 @@ class UpgradePlaner(BaseWorkerService):
 
     - otherService.event: v>1.1
 
-    rcp
+    rpc
     ###
 
     hello(name: string): string
@@ -383,15 +383,8 @@ class UpgradePlaner(BaseWorkerService):
         res = {}
         for service in (self._unserialize_service(serv) for serv in self.mongo.catalog.find()):
             sorted_versions = self.sort_versions(service['versions'].values())
-            res[service['name']] = str(sorted_versions[0].version)
+            res[service['name']] = str(sorted_versions[0])
         return res
-
-    def sort_versions(self, versions):
-
-        sorted_version_metadata = list(sorted(
-            versions, reverse=True, key=lambda vinfo: ImageVersion.deserialize(vinfo['image_info'])))
-
-        return [v['version'] for v in sorted_version_metadata]
 
     @rpc
     @log_all
@@ -514,7 +507,6 @@ class UpgradePlaner(BaseWorkerService):
         phases = [Phase.deserialize(phase) for phase in solved_phases['results']]
         logger.debug("resolved phases : %s", phases)
         goal, rank = self.solve_best_phase(phases)  # type: Phase[PhasePin], int
-        logger.debug("goal phase ranked %d: %s", rank, goal)
         """
         goal is the best noted phase given by all compatible phases.
         """
@@ -525,7 +517,7 @@ class UpgradePlaner(BaseWorkerService):
                     "steps": []
                 }
             }
-
+        logger.debug("goal phase ranked %d: %s", rank, goal)
         steps = self.build_steps(goal)
         if steps:
             logger.debug("resolved steps :\n%s", '\n'.join([
@@ -546,6 +538,16 @@ class UpgradePlaner(BaseWorkerService):
     # ################################################
     # private methodes
     # ################################################
+
+    def sort_versions(self, versions):
+        """
+        short the given version from the hiest version to the lowest
+        :param versions: the list of version (as in service['versions']
+        :return: a list of version numbers ordered
+        """
+        sorted_version_metadata = list(sorted(
+            versions, reverse=True, key=lambda vinfo: ImageVersion.deserialize(vinfo['image_info'])))
+        return [v['version'] for v in sorted_version_metadata]
 
     def _run_step(self, next_step, running_scheduled):
         # doing the upgrade from to

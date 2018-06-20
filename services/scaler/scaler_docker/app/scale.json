@@ -5,9 +5,15 @@
     "require": [
 
     ],
-    "optional": [
-    ]
-  },
-  "metric": [
-  ]
+    "provide": {
+      "scaler_docker:http": 1,
+      "scaler_docker:event:service_updated": 1,
+      "scaler_docker:event:image_updated": 1,
+      "scaler_docker:rpc:update": 1,
+      "scaler_docker:rpc:get": 1,
+      "scaler_docker:rpc:list_services": 1,
+      "scaler_docker:rpc:fetch_image_config": 1
+    }
+
+  }
 }

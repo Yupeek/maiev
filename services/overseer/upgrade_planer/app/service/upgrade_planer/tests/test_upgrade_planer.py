@@ -583,3 +583,23 @@ class TestSolveBestPhase(object):
         goal, rank = s
         assert 2 == rank
         assert goal == [[{"name": "producer", }, "1.0.1"], [{"name": "consumer", }, "1.0.17"]]
+
+    def test_get_latest_phase(self, upgrade_planer: UpgradePlaner):
+
+        upgrade_planer.mongo.catalog.find.return_value = [
+            {"name": "producer", "versions_list": self.build_catalog("producer", ["1.0.5", "1.0.16", "1.0.17"])},
+            {"name": "consumer", "versions_list": self.build_catalog("consumer", ["1.0.5", "1.0.17"])},
+        ]
+
+        s = upgrade_planer.get_latest_phase()
+        assert {"producer": "1.0.17", "consumer": "1.0.17"} == s
+
+    def test_get_latest_phase_beta(self, upgrade_planer: UpgradePlaner):
+
+        upgrade_planer.mongo.catalog.find.return_value = [
+            {"name": "producer", "versions_list": self.build_catalog("producer", ["1.0.5", "1.0.16b", "1.0.17"])},
+            {"name": "consumer", "versions_list": self.build_catalog("consumer", ["1.0.5", "1.0.17b"])},
+        ]
+
+        s = upgrade_planer.get_latest_phase()
+        assert {"producer": "1.0.17", "consumer": "1.0.17b"} == s

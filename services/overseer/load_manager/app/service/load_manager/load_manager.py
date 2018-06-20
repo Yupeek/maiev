@@ -28,7 +28,7 @@ class LoadManager(BaseWorkerService):
 
     - otherService.event: v>1.1
 
-    rcp
+    rpc
     ###
 
     hello(name: string): string

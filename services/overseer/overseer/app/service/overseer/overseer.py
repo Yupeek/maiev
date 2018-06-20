@@ -37,7 +37,7 @@ class Overseer(BaseWorkerService):
 
     - scaler.*[image_update]
 
-    rcp
+    rpc
     ###
 
     deploy(image_type: str, image_name: str)
@@ -49,10 +49,6 @@ class Overseer(BaseWorkerService):
     scaler_docker = RpcProxy("scaler_docker")
     """
     :type: service.scaler_docker.scaler_docker.ScalerDocker
-    """
-    trigger = RpcProxy('trigger')
-    """
-    :type: service.trigger.trigger.Trigger
     """
     load_manager = RpcProxy('overseer_load_manager')
     """

@@ -306,7 +306,7 @@ class DependencySolver(BaseWorkerService):
     this service use CSP and backtracking alogrithme to solve the best dependency for
     running service.
 
-    rcp
+    rpc
     ###
 
     hello(name: string): string
