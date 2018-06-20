@@ -28,7 +28,7 @@ def accept_all(version, service):
 
 
 def no_downgrade(version, service):
-    return version == 'latest' or Version(version['version']) >= Version(service['version'])
+    return version == 'latest' or Version.coerce(version['version']) >= Version.coerce(service['version'])
 
 
 def static_version(phase):

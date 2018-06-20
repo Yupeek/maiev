@@ -258,6 +258,57 @@ class TestUpgradePlaner(object):
             }
         ]
 
+    def test_build_catalog_beta_versions(self, upgrade_planer: UpgradePlaner, service):
+        service['consumer']['image']['image_info']['version'] = '1.0.16b'
+        service['producer']['image']['image_info']['version'] = '1.0.16b'
+        upgrade_planer.mongo.catalog.find.return_value = [{
+            "name": "consumer",
+            "service": service['consumer'],
+            "versions_list": [
+                {"version": "1.0.16b", "dependencies": {
+                    "require": [
+                        "producer:rpc:echo"
+                    ]
+                }}],
+
+            "version": service['consumer']['image']['image_info']['version'],
+        }, {
+            "name": "producer",
+            "service": service['producer'],
+            "versions_list": [
+                {"version": "1.0.16b", "dependencies": {
+                    "provide": {
+                        "producer:rpc:echo": 1
+                    }}}
+            ],
+            "version": service['producer']['image']['image_info']['version'],
+
+        }
+        ]
+        c = upgrade_planer.build_catalog()
+        assert c == [
+            {
+                "name": "consumer",
+                "versions": {
+                    "1.0.16b": {
+                        "provide": {},
+                        "require": ["producer:rpc:echo"]
+                    },
+                }
+            },
+            {
+                "name": "producer",
+                "versions": {
+                    "1.0.16b": {
+                        "provide": {
+                            "producer:rpc:echo": 1
+                        },
+                        "require": []
+                    },
+                }
+            }
+        ]
+
     def test_build_catalog_no_solution(self, upgrade_planer: UpgradePlaner, service):
         upgrade_planer.mongo.catalog.find.return_value = [{
             "name": "consumer",
