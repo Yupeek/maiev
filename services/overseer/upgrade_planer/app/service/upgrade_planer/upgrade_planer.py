@@ -39,7 +39,10 @@ def static_version(phase):
     """
 
     def filter_(version, service):
-        return phase[service['name']] == version['version']
+        try:
+            return phase[service['name']] == version['version']
+        except KeyError:
+            return False
 
     return filter_
 

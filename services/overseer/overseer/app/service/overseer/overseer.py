@@ -448,14 +448,23 @@ class Overseer(BaseWorkerService):
 
         """
         changes = {}
-        if service_data['mode'] != service['mode']:
-            if service_data['mode']['name'] == "replicated" and service['mode']['name'] == "replicated":
-                changes['scale'] = {'from': service['mode']['replicas'], 'to': service_data['mode']['replicas']}
-            else:
-                changes['mode'] = {'from': service['mode'], 'to': service_data['mode']}
+        try:
+            if service_data['mode'] != service['mode']:
+                if service_data['mode']['name'] == "replicated" and service['mode']['name'] == "replicated":
+                    changes['scale'] = {'from': service['mode']['replicas'], 'to': service_data['mode']['replicas']}
+                else:
+                    changes['mode'] = {'from': service['mode'], 'to': service_data['mode']}
+        except KeyError:
+            pass
         img_version_serialized = ImageVersion.from_scaler(service_data).serialize()
-        if img_version_serialized != service['image']['image_info']:
-            changes['image'] = {'from': service['image']['image_info'], 'to': img_version_serialized}
-        if 'updatestate.new' in attributes:
-            changes['state'] = {'from': attributes.get('updatestate.old'), 'to': attributes['updatestate.new']}
+        try:
+            if img_version_serialized != service['image']['image_info']:
+                changes['image'] = {'from': service['image']['image_info'], 'to': img_version_serialized}
+        except KeyError:
+            pass
+        try:
+            if 'updatestate.new' in attributes:
+                changes['state'] = {'from': attributes.get('updatestate.old'), 'to': attributes['updatestate.new']}
+        except KeyError:
+            pass
         return changes

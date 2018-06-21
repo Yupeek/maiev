@@ -21,10 +21,7 @@
       ],
       "monitorer_rabbitmq:rpc:track": 1,
       "monitorer_rabbitmq:rpc:track:args": ["queue_identifier"]
-    },
-    "optional": [
-    ]
-  },
-  "metric": [
-  ]
+    }
+  }
+
 }

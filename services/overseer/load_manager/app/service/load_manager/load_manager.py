@@ -128,6 +128,9 @@ class LoadManager(BaseWorkerService):
         )
         if 'scale' in service['scale_config']:
             self._set_trigger_rules(service['name'], service['scale_config']['scale'])
+        else:
+            # remove rules if it previously existed
+            self.trigger.delete(self.name, service['name'])
 
     @rpc
     @log_all
