@@ -246,11 +246,11 @@ class Solver(object):
                     "service": service['name'],
                     "provided": provided
                 })
-                self.anomalies.append({
-                    "expression": require.original_string,
-                    "service": service['name'],
-                    "error": repr(e)
-                })
+            self.anomalies.append({
+                "expression": require.original_string,
+                "service": service['name'],
+                "error": repr(e)
+            })
             return False
         else:
             return True
@@ -289,15 +289,16 @@ class Solver(object):
         for i, (remaining_service, versions) in enumerate(remaining_services):
 
             for version_num, version in sorted(versions.items(), reverse=True):
+                living_solution = tmp_solution + [(remaining_service, version_num)]
                 for c in constraints:
-                    if not c(remaining_service, version, tmp_solution):
+                    if not c(remaining_service, version, living_solution):
                         break
                 else:
                     # all check passed
                     yield from self.backtrack(
                         remaining_services[:i] + remaining_services[i + 1:],
                         constraints,
-                        tmp_solution + [(remaining_service, version_num)]
+                        living_solution
                     )
 
 
@@ -316,7 +317,7 @@ class DependencySolver(BaseWorkerService):
 
     @rpc
     @log_all
-    def solve_dependencies(self, catalog, extra_constraints=tuple()):
+    def solve_dependencies(self, catalog, extra_constraints=tuple(), debug=False):
         """
         build all possibles phases for the given catalog respecting given constraints.
 
@@ -335,7 +336,7 @@ class DependencySolver(BaseWorkerService):
         :rtype:   list of tuple with [0]=service data , [1]=version
         """
         try:
-            s = Solver(catalog, extra_constraints)
+            s = Solver(catalog, extra_constraints, debug=debug)
             return {
                 "results": list(s.solve()),
                 "errors": [],

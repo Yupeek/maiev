@@ -40,7 +40,11 @@ install:  ## init current docker to swarm for test
 	-docker service create --name registry_docker --publish 5000:5000 \
 		--replicas 1 --network=$(NETWORK_NAME) $(DOCKER_REPO)/registry_docker  && sleep 1
 
-
+update-global-dep:
+	jq -s '.[0] * (.[1:] | {"dependencies": {"provide": (reduce .[] as $$item ({}; . * if $$item.dependencies.provide == null then {} else $$item.dependencies.provide end)), "require": (reduce .[] as $$item ([]; . + $$item.dependencies.require))}})' \
+	    global/app/scale.json $(shell find services/ -iname "scale.json") | \
+	         tee global/app/scale2.json
+	mv global/app/scale2.json global/app/scale.json
 
 dev:
 	TARGET=dev $(MAKE) build-image

@@ -2,47 +2,7 @@
   "min": 1,
   "max": 1,
   "dependencies": {
-    "require": [
-      "producer:rpc:echo",
-      "\"*args\" in producer:rpc:echo:args",
-      "dependency_solver:rpc:explain > 0",
-      "dependency_solver:rpc:solve_dependencies > 0",
-      "overseer:rpc:get_service > 0",
-      "overseer:rpc:upgrade_service > 0",
-      "overseer:event:service_updated > 0",
-      "overseer:event:new_image > 0",
-      "scaler_docker:rpc:fetch_image_config > 0",
-      "scaler_docker:rpc:list_services > 0",
-      "scaler_docker:rpc:update > 0",
-      "load_manager:rpc:monitor_service > 0",
-      "overseer:rpc:scale > 0",
-      "trigger:rpc:delete > 0",
-      "trigger:rpc:compute > 0",
-      "trigger:rpc:add > 0",
-      "overseer:event:service_updated > 0",
-      "\"metrics.exists\" in monitorer_rabbitmq:event:metrics_updated:params",
-      "monitorer_rabbitmq:rpc:track >= 1"
-    ],
     "provide": {
-      "producer:rpc:get": 1,
-      "producer:rpc:get:args": [],
-      "producer:rpc:get:rtype": [
-        "int"
-      ],
-      "producer:rpc:echo": 1,
-      "producer:rpc:echo:args": [
-        "*args",
-        "**kwargs"
-      ],
-      "producer:rpc:echo:rtype": [
-        "args",
-        "kwargs"
-      ],
-      "producer:rpc:raises": 1,
-      "producer:rpc:raises:args": [
-        "message"
-      ],
-      "producer:rpc:raises:rtype": [],
       "dependency_solver:rpc:solve_dependencies": 1,
       "dependency_solver:rpc:solve_dependencies:args": [
         "catalog",
@@ -134,6 +94,25 @@
         "ruleset",
         "rules_stats"
       ]
-    }
+    },
+    "require": [
+      "dependency_solver:rpc:explain > 0",
+      "dependency_solver:rpc:solve_dependencies > 0",
+      "overseer:rpc:get_service > 0",
+      "overseer:rpc:upgrade_service > 0",
+      "overseer:event:service_updated > 0",
+      "overseer:event:new_image > 0",
+      "scaler_docker:rpc:fetch_image_config > 0",
+      "scaler_docker:rpc:list_services > 0",
+      "scaler_docker:rpc:update > 0",
+      "load_manager:rpc:monitor_service > 0",
+      "overseer:rpc:scale > 0",
+      "trigger:rpc:delete > 0",
+      "trigger:rpc:compute > 0",
+      "trigger:rpc:add > 0",
+      "overseer:event:service_updated > 0",
+      "\"metrics.exists\" in monitorer_rabbitmq:event:metrics_updated:params",
+      "monitorer_rabbitmq:rpc:track >= 1"
+    ]
   }
 }
