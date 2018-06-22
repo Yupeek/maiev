@@ -217,7 +217,7 @@ class UpgradePlaner(BaseWorkerService):
                 # call back overseer to get info about current version.
                 overseer_service = self.overseer.get_service(service['name'])
                 o_version_number = overseer_service['image']['image_info']['version']
-                scale_config_ = overseer_service['scale_config']
+                scale_config_ = overseer_service['scale_config'] or {}
                 service['versions'][o_version_number] = {
                     "version": o_version_number,
                     "image_info": overseer_service['image']['image_info'],

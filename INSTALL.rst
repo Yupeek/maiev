@@ -118,8 +118,7 @@ with a docker swarm setup, you can do this:
         -e RABBITMQ_USER=maiev \
         -e RABBITMQ_PASSWORD=$MAIEVPASSWD \
         -e MONGO_URIS=mongodb://maive:$MAIEVPASSWD@mongodb.myservices.com/overseer \
-        --secret maiev_docker_cred.json \
-        -e DOCKER_CREDENTIALS_SECRET=maiev_docker_cred.json \
+        --secret source=maiev_docker_cred.json,target=/home/service/.docker/config.json \
         --publish 80:8000 \
         --constraint 'node.role == manager' \
         yupeek/maiev:global-latest
@@ -130,7 +129,7 @@ this will start maiev. with the folowing specificites.
 - the scaler_docker part will use the "--mount" to connect to the docker swarm cluster and control it. so
   it's required that maiev run in a manager node (as forced by --constraint)
 - the scaler_docker may need to connect to private registry or project. so we add a secret with our current docker
-  credentials. (docker secret add + --secret + DOCKER_CREDENTIALS_SECRET)
+  credentials. (docker secret add + --secret source=,target=)
 - the scaler docker service should be notified for new images. so his port 8000 must be published. the host port can
   be anything you whant, but must match the webhook you configured in your docker registry.
 - the MONGO_URIS should be a full uri to connect to mongodb. keep in mind that there will be many databases created.
