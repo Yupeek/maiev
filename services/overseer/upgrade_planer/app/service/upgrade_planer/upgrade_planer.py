@@ -372,6 +372,15 @@ class UpgradePlaner(BaseWorkerService):
         """
 
         catalog = self.build_catalog(static_version(phase))
+        missing = []
+        for service in catalog:
+            if not service['versions']:
+                missing.append(service['name'])
+        if missing:
+            raise Exception("the catalog contains %d services without valid version: %s" % (
+                    len(missing), ','.join(missing)
+                )
+            )
         return self.dependency_solver.explain(catalog)
 
     @rpc
@@ -518,23 +527,25 @@ class UpgradePlaner(BaseWorkerService):
                 "result": {
                     "best_phase": None,
                     "steps": []
+                },
+                "debug": {
+                    "catalog": catalog,
+                    "solved_phases": solved_phases,
+                    "goal": goal,
+                    "rank": rank,
                 }
             }
-        logger.debug("goal phase ranked %d: %s", rank, goal)
         steps = self.build_steps(goal)
-        if steps:
-            logger.debug("resolved steps :\n%s", '\n'.join([
-                "%s %s=>%s" % step
-                for step in steps
-            ]))
-        else:
-            logger.debug("aucune resolution possible pour atteindre la phase %s",
-                         {t.service['name']: t.version for t in goal})
-
         return {
             "result": {
                 "best_phase": goal,
                 "steps": steps
+            },
+            "debug": {
+                "catalog": catalog,
+                "solved_phases": solved_phases,
+                "goal": goal,
+                "rank": rank,
             }
         }
 
