@@ -377,7 +377,8 @@ class UpgradePlaner(BaseWorkerService):
             if not service['versions']:
                 missing.append(service['name'])
         if missing:
-            raise Exception("the catalog contains %d services without valid version: %s" % (
+            raise Exception(
+                "the catalog contains %d services without valid version: %s" % (
                     len(missing), ','.join(missing)
                 )
             )
