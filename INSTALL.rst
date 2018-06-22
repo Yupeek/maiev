@@ -21,16 +21,6 @@ the minimal setup must be reached to make it possible to deploy other part. this
 
 - a running mondogb instance
 
-- a running main monitoring instance (Overseer)
-
-- a running docker scaler to interact with docker swarm
-
-
-.. note::
-
-	the scaler_docker service must have access to the swarm manager node. this lead to a further configuration for the
-	manager node by adding ``-H tcp://0.0.0.0:2375 `` to the dockerd arguments
-
 - a running docker repository configured to notify push to scaler-docker
 
 .. code:: bash
@@ -99,11 +89,59 @@ you will pass this env during the `docker service create` call via the `-e MONGO
 rabbitmq service
 ================
 
-the message queue used by maiev is rabbitmq
+the message queue used by maiev is rabbitmq. try to install it on a specific part of your stack (dedicated host).
+using a rabbitmq as a swarm service is discouraged.
 
-.. code:: bash
 
-	docker service create --name rabbitmq --replicas 1 --network=${NETWORK_NAME} rabbitmq:3-management
+all in one: global
+==================
+
+maiev is split into 7 components built as micro-services. but to be easier to depoly, we made a uniq image named «global»
+which ship all 7 services into one docker image. this is the fastest way to deploy maiev.
+
+**this is the recomended deployment process**
+
+
+with a docker swarm setup, you can do this:
+
+.. code-block:: bash
+
+    MAIEVPASSWD='mycommonpassword'
+    # docker login to access private repository
+    cat ~/.docker/config.json | docker secret create maiev_docker_cred.json -
+
+    docker service create \
+        --name maiev \
+        --mount type=bind,src=//var/run/docker.sock,dst=/var/run/docker.sock \
+        -e RABBITMQ_HOST=rabbitmq.myservices.com \
+        -e RABBITMQ_VHOST=/maiev \
+        -e RABBITMQ_USER=maiev \
+        -e RABBITMQ_PASSWORD=$MAIEVPASSWD \
+        -e MONGO_URIS=mongodb://maive:$MAIEVPASSWD@mongodb.myservices.com/overseer \
+        --secret maiev_docker_cred.json \
+        -e DOCKER_CREDENTIALS_SECRET=maiev_docker_cred.json \
+        --publish 80:8000 \
+        --constraint 'node.role == manager' \
+        yupeek/maiev:global-latest
+
+this will start maiev. with the folowing specificites.
+
+- all env RABBITMQ_* will be used to connect to rabbitmq.
+- the scaler_docker part will use the "--mount" to connect to the docker swarm cluster and control it. so
+  it's required that maiev run in a manager node (as forced by --constraint)
+- the scaler_docker may need to connect to private registry or project. so we add a secret with our current docker
+  credentials. (docker secret add + --secret + DOCKER_CREDENTIALS_SECRET)
+- the scaler docker service should be notified for new images. so his port 8000 must be published. the host port can
+  be anything you whant, but must match the webhook you configured in your docker registry.
+- the MONGO_URIS should be a full uri to connect to mongodb. keep in mind that there will be many databases created.
+
+
+detailed services
+*****************
+
+each services of maiev is shiped as a dedicated image if you don't use global.
+this part of the documentation is not recomanded because of his complexity.
+
 
 scaler_docker
 =============

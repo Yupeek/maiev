@@ -80,11 +80,11 @@ with a docker swarm setup, you can do this:
         -e RABBITMQ_USER=maiev \
         -e RABBITMQ_PASSWORD=$MAIEVPASSWD \
         -e MONGO_URIS=mongodb://maive:$MAIEVPASSWD@mongodb.myservices.com/overseer \
-        -e PYTHONUNBUFFERED=1 \
         --secret maiev_docker_cred.json \
         -e DOCKER_CREDENTIALS_SECRET=maiev_docker_cred.json \
         --publish 80:8000 \
         --constraint 'node.role == manager' \
         yupeek/maiev:global-latest
 
-this will start maiev. it will query the
+this will start maiev. it will query all existings services to start monitoring each one which has the
+command «scaler_info».
