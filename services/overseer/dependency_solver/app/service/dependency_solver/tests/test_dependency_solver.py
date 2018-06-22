@@ -14,12 +14,14 @@ class TestSolver:
             "versions": {
                 1: {
                     "provide": {
+                        "service1:version": 1,
                         "service1:event:ping": 1, "service1:rpc:hello": 1, "service1:rpc:hello:args": ["name"]
                     },
                     "require": []
                 },
                 2: {
                     "provide": {
+                        "service1:version": 2,
                         "service1:event:ping": 1, "service1:rpc:hello": 2, "service1:rpc:hello:args": ["name", "world"]
                     },
                     "require": []
@@ -83,7 +85,7 @@ class TestSolver:
         assert set(objects_) == {"service1", "service2"}
 
         s1_ = {st.global_name: st for st in objects_['service1'].subtables}
-        assert set(o.global_name for o in objects_['service1'].objects) == {'event', 'rpc'}
+        assert set(o.global_name for o in objects_['service1'].objects) == {'event', 'rpc', 'version'}
         assert set(s1_) == {'event', 'rpc'}
 
         s2_ = {st.global_name: st for st in s1_['rpc'].subtables}
@@ -137,7 +139,7 @@ class TestSolver:
             assert expected == res
 
     def test_solve_extra2(self):
-        s = Solver(self.CATALOG1, ("service1 == 1",))
+        s = Solver(self.CATALOG1, ("service1:version == 1",))
         expected_solutions = [
             (('service1', 1), ('service2', 1)),
         ]
