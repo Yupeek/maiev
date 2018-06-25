@@ -208,26 +208,29 @@ class UpgradePlaner(BaseWorkerService):
         :return:
         """
         for service in (self._unserialize_service(s) for s in self.mongo.catalog.find()):
-            versions = service['versions']
-            if not service['version'] in service['versions']:
-                logger.error(
-                    "the service is fixed to a version which is not listed in available versions\n%s not in %s",
-                    service['version'], versions
-                )
-                # call back overseer to get info about current version.
-                overseer_service = self.overseer.get_service(service['name'])
-                o_version_number = overseer_service['image']['image_info']['version']
-                scale_config_ = overseer_service['scale_config'] or {}
-                service['versions'][o_version_number] = {
-                    "version": o_version_number,
-                    "image_info": overseer_service['image']['image_info'],
-                    "dependencies": scale_config_.get('dependencies', {})
-                }
-                service['version'] = o_version_number
-                self._save_service(service)
+            try:
+                versions = service['versions']
+                if not service['version'] in service['versions']:
+                    logger.error(
+                        "the service is fixed to a version which is not listed in available versions\n%s not in %s",
+                        service['version'], versions
+                    )
+                    # call back overseer to get info about current version.
+                    overseer_service = self.overseer.get_service(service['name'])
+                    o_version_number = overseer_service['image']['image_info']['version']
+                    scale_config_ = overseer_service['scale_config'] or {}
+                    service['versions'][o_version_number] = {
+                        "version": o_version_number,
+                        "image_info": overseer_service['image']['image_info'],
+                        "dependencies": scale_config_.get('dependencies', {})
+                    }
+                    service['version'] = o_version_number
+                    self._save_service(service)
 
-                logger.error("resolved previous error with call back to overseer: got version %s data",
-                             o_version_number)
+                    logger.error("resolved previous error with call back to overseer: got version %s data",
+                                 o_version_number)
+            except Exception:
+                logger.exception("error while scaning sanity of %s", service.get('name', '<noname>'))
 
     @once
     @log_all
