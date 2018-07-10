@@ -9,7 +9,6 @@
         "--rm",
         "--network={networkname}",
         "-p", "5000:5000",
-        "--link=scaler_docker:scaler_docker",
         "--name={docker_name}",
         "{service_name}:dev"
       ],
@@ -19,7 +18,11 @@
         "{docker_name}"
       ],
       "type": "script",
-      "waitUntil": 2500
+      "waitUntil": 2500,
+      "waitUntilStr": "listening on ",
+      "context": {
+        "docker_name": "localdocker"
+      }
     }
   ],
   "context": {

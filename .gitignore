@@ -91,3 +91,5 @@ ENV/
 node_modules/
 
 .pytest_cache
+
+.docker/config.json

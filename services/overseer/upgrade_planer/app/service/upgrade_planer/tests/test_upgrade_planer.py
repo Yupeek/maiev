@@ -118,6 +118,7 @@ class TestUpgradePlaner(object):
                 'tag': 'producer-1.0.1',
                 'version': '1.0.1'
             },
+            "available": True
         }
         upgrade_planer.dispatch.assert_called_with(
             "new_version",
@@ -149,6 +150,7 @@ class TestUpgradePlaner(object):
                     'tag': 'producer-1.0.1',
                     'version': '1.0.1'
                 },
+                "available": True
             }
             ],
         }
@@ -170,6 +172,8 @@ class TestUpgradePlaner(object):
                     'tag': 'producer-1.0.0',
                     'version': '1.0.0'
                 },
+                "available": True
+
             }],
         }
         upgrade_planer.on_new_version(event_payload)
@@ -183,6 +187,7 @@ class TestUpgradePlaner(object):
                            'tag': 'producer-1.0.1',
                            'version': '1.0.1'
                        },
+                       "available": True
                        }
         upgrade_planer.dispatch.assert_called_with(
             "new_version",
@@ -202,6 +207,7 @@ class TestUpgradePlaner(object):
                                 'tag': 'producer-1.0.0',
                                 'version': '1.0.0'
                             },
+                            "available": True
                         },
                         "1.0.1": new_version
                     },

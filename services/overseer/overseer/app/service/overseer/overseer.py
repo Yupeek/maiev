@@ -3,12 +3,11 @@ import copy
 import logging
 import pprint
 import time
-from functools import partial
 
-from nameko import timer
 from nameko.events import SERVICE_POOL, EventDispatcher, event_handler
 from nameko.exceptions import RemoteError, UnknownService
 from nameko.rpc import RpcProxy, rpc
+from nameko.timer import timer
 from promise.promise import Promise
 
 from common.base import BaseWorkerService
@@ -82,6 +81,21 @@ class Overseer(BaseWorkerService):
           name: replicated
           replicas: 23
 
+    versions
+    ########
+
+    store history of all version available in registry.
+    it's used to emit «new_version» or «unavailable_version»
+
+    his format is exactly what ImageVersion.serialize output::
+
+        repository: localhost:5000
+        image: maiev
+        tag: producer-1.0.16
+        species: producer
+        version: 1.0.16
+        digest: sha256:581647ffd59fc7dc9b2f164fe299de29bf99fb1cb304c41ea07d8fa3f95f052b
+
     """
 
     dispatch = EventDispatcher()
@@ -126,6 +140,38 @@ class Overseer(BaseWorkerService):
             from: 2
             to: 3
 
+    new_image
+    #########
+
+    emmited each timeea new image is detected on the targeted registry
+
+    payload::
+
+        service:  # all current data of the service
+          name: producer
+          image:
+            type: docker
+            image_info: # ImageVersion.serializ
+              repository: localhost:5000
+              image: maiev
+              tag: producer-1.0.16
+              species: producer
+              version: 1.0.16
+              digest: sha256:581647ffd59fc7dc9b2f164fe299de29bf99fb1cb304c41ea07d8fa3f95f052b
+            full_image_id: localhost:5000/maiev:producer
+          scale_config:  # content of scale_info
+          mode:
+            name: replicated
+            replicas: 23
+        image:  # ImageVersion data of the new image
+          repository: localhost:5000
+          image: maiev
+          tag: producer-1.0.17
+          species: producer
+          version: 1.0.17
+          digest: sha256:581647ffd59fc7dc9b2f164fe299de29bf99fb1cb304c41ea07d8fa3f95f052b
+        scale_config: scale_config
+
     """
 
     type_to_scaler = {
@@ -135,6 +181,68 @@ class Overseer(BaseWorkerService):
 
     # ####################################################
     #                 TIMER
+    # ####################################################
+
+    @once
+    @timer(interval=60 * 30)  # every 30 minutes
+    @rpc
+    @log_all
+    def recheck_new_version(self):
+        """
+        check in a new version is present for each managed services.
+        it's a fallback if we missed the notification of the registry.
+
+        :return:
+        """
+        images = {}
+
+        # first, we get all images used by services.
+        # many services can use same image. so we aggregates them
+        for service in self._get_services(scaler_type='docker'):
+            k = "{repository}/{image}".format(**service['image']['image_info'])
+            images.setdefault(k, []).append(service)
+
+        logger.debug("images and services to check : %s", {k: [i['name'] for i in v] for k, v in images.items()})
+        # we start by checking each images
+        for image, services in images.items():
+
+            repository_tags = set(self.scaler_docker.list_tags(image))
+
+            image_info = services[0]['image']['image_info']
+            query = {
+                "repository": image_info['repository'],
+                "image": image_info['image']
+            }
+            versions = {v['tag']: ImageVersion.deserialize(v) for v in self.mongo.versions.find(query)}
+            """:type dict[str, ImageVersion]"""
+            existing_tags = set(versions)
+            for missing_tag in existing_tags - repository_tags:
+                removed_version = versions[missing_tag]
+                # we notify all services using this images
+                for service in services:
+                    # do this service (which use this image) use this spacie too ?
+                    if service['image']['full_image_id'] != removed_version.image_id:
+                        continue
+                    logger.info("detected %s image removed %s: %s", service['name'], missing_tag, removed_version)
+                    self.dispatch('cleaned_image', {'service': filter_dict(service),
+                                                    'image': filter_dict(removed_version.serialize())})
+                    self.mongo.versions.remove({'_id': removed_version.data['_id']})
+
+            for new_tag in repository_tags - existing_tags:
+                constructed_version = ImageVersion.from_scaler({
+                    "repository": image_info['repository'],
+                    "image": image_info['image'],
+                    "tag": new_tag,
+                })
+                for service in services:
+                    # do this service (which use this image) use this spacie too ?
+                    if service['image']['full_image_id'] != constructed_version.image_id:
+                        continue
+                    logger.info("detected %s new image %s: %s", service['name'], new_tag, constructed_version)
+                    self._notify_new_image('docker', constructed_version)
+
+    # ####################################################
+    #                 EVENT
     # ####################################################
 
     @event_handler(
@@ -194,7 +302,7 @@ class Overseer(BaseWorkerService):
     @log_all
     def on_image_updated(self, payload):
         """
-        each time an image is updated
+        each time an image is uploaded into a registry and the registry triggered us
         :param payload: the event data, must contains :
             - from: the name of the service (ie: scaler_docker)
             - image_name: the name of the image
@@ -208,17 +316,7 @@ class Overseer(BaseWorkerService):
             return  # update can be called with blob update instead of images
 
         image_version = ImageVersion.from_scaler(payload)
-        logger.debug("version found for this push : %s. searching for %s", image_version, image_version.image_id)
-
-        for service in self._get_services(scaler_type=scaler_type, full_image_id=image_version.image_id):
-            logger.debug("getting image config for %s", image_version.unique_image_id)
-            scale_config = self.scaler_docker.fetch_image_config(image_version.unique_image_id)
-            logger.debug("will dispatch new event for service %s", service['name'])
-            self.dispatch("new_image", {
-                "service": filter_dict(service),
-                "image": image_version.serialize(),
-                "scale_config": scale_config
-            })
+        self._notify_new_image(scaler_type, image_version)
 
     # ####################################################
     #                 ONCE
@@ -294,7 +392,8 @@ class Overseer(BaseWorkerService):
         try:
             self.load_manager.monitor_service.call_async(result)
         except UnknownService:
-            logger.error("no load_manager running to catch monitoring request for %s", service_name)
+            logger.error("no load_manager running to catch monitoring request for %s. you can re-call monitor(%s) "
+                         "later to fix it", service_name, service_name)
         self.dispatch('service_updated', {"service": filter_dict(result), "diff": {}})
 
     @rpc
@@ -385,12 +484,14 @@ class Overseer(BaseWorkerService):
     def _remove_service(self, service_name):
         return self.mongo.services.remove({'name': service_name})
 
-    def _get_services(self, scaler_type, full_image_id=None):
+    def _get_services(self, scaler_type=None, full_image_id=None):
+        _and = []
+        if scaler_type:
+            _and.append({'image.type': scaler_type})
+        if full_image_id:
+            _and.append({'image.full_image_id': full_image_id})
         q = {
-            "$and": [
-                {'image.type': scaler_type},
-                {'image.full_image_id': full_image_id},
-            ]
+            "$and": _and
         }
         return self.mongo.services.find(q)
 
@@ -473,3 +574,23 @@ class Overseer(BaseWorkerService):
             changes['state'] = {'from': attributes.get('updatestate.old'), 'to': attributes['updatestate.new']}
 
         return changes
+
+    def _notify_new_image(self, scaler_type, image_version):
+        """
+        check if this new version is meaningfull for our cluster and dispatch «new_image» event in this case.
+        :param scaler_type:
+        :param image_version:
+        :return:
+        """
+        logger.debug("version found for this push : %s. searching for %s", image_version, image_version.image_id)
+
+        for service in self._get_services(scaler_type=scaler_type, full_image_id=image_version.image_id):
+            logger.debug("getting image config for %s", image_version.unique_image_id)
+            scale_config = self.scaler_docker.fetch_image_config(image_version.unique_image_id)
+            logger.debug("will dispatch new event for service %s", service['name'])
+            self.dispatch("new_image", {
+                "service": filter_dict(service),
+                "image": image_version.serialize(),
+                "scale_config": scale_config
+            })
+            self.mongo.versions.insert(image_version.serialize())
