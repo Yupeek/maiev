@@ -10,7 +10,10 @@
     }
   ],
   "context": {
-    "extra_volume": "-v=/var/run/docker.sock:/var/run/docker.sock",
+    "extra_volume": [
+      "-v", "/var/run/docker.sock:/var/run/docker.sock",
+      "-v", "{root}/.docker/config.json:/home/service/.docker/config.json"
+    ],
     "extra_env": ["-e", "NAMEKO_LOG_LEVEL=INFO", "-e", "CONSOLE_LOG_FILTERS=[filtergetroot]"]
   },
   "discover": []

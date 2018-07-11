@@ -247,3 +247,130 @@ class TestOverseerServiceEvent(object):
         overseer.check_new_scale_config({'diff': self.DIFF_IMAGE, 'service': filter_dict(service)})
         overseer.mongo.services.update_one.assert_called()
         overseer.dispatch.assert_called()
+
+    def test_new_image_notified(self, overseer: Overseer, service):
+        overseer.mongo.services.find.return_value = [service]
+        overseer.on_image_updated({
+            'from': 'scaler_docker',
+            'digest': 'sha256:aaa',
+            'image': 'maiev',
+            'repository': 'localhost:5000',
+            'tag': 'consumer-1.0.1',
+            'full_image_id': 'localhost:5000/maiev@sha256:aaa',
+            'scale_config': None
+        })
+        overseer.dispatch.assert_called_with('new_image', {
+            "service": filter_dict(service),
+            "image": {'repository': 'localhost:5000',
+                      'image': 'maiev',
+                      'tag': 'consumer-1.0.1',
+                      'species': 'consumer',
+                      'version': '1.0.1',
+                      'digest': 'sha256:aaa'},
+            "scale_config": service['scale_config']
+        })
+
+    def test_new_image_notified_not_monitored(self, overseer: Overseer, service):
+        overseer.mongo.services.find.return_value = []
+        overseer.on_image_updated({
+            'from': 'scaler_docker',
+            'digest': 'sha256:aaa',
+            'image': 'maiev',
+            'repository': 'localhost:5000',
+            'tag': 'consumer-1.0.1',
+            'full_image_id': 'localhost:5000/maiev@sha256:aaa',
+            'scale_config': None
+        })
+        overseer.dispatch.assert_not_called()
+
+
+class TestRecheck:
+
+    def test_all_known_versions(self, overseer: Overseer, service_data, service):
+        overseer.mongo.versions.find.return_value = [
+            {'digest': 'sha256:40c6c8b1a244746d4c351f9079848cf6325342a9023b8bf143a59201b8e0b789',
+             'image': 'maiev',
+             'repository': 'localhost:5000',
+             'species': 'consumer',
+             'tag': 'consumer-1.0.1',
+             'version': '1.0.1'},
+            {'digest': 'lolilol',
+             'image': 'maiev',
+             'repository': 'localhost:5000',
+             'species': 'producer',
+             'tag': 'producer-1.0.1',
+             'version': '1.0.1'},
+        ]
+        overseer.scaler_docker.list_tags.return_value = ['consumer-1.0.1', 'producer-1.0.1']
+        overseer.mongo.services.find.return_value = [service]
+        overseer.recheck_new_version()
+        overseer.dispatch.assert_not_called()
+        overseer.mongo.version.insert.assert_not_called()
+        overseer.mongo.version.remove.assert_not_called()
+
+    def test_cleaned_version(self, overseer: Overseer, service_data, service):
+        overseer.mongo.versions.find.return_value = [
+            {'digest': 'sha256:40c6c8b1a244746d4c351f9079848cf6325342a9023b8bf143a59201b8e0b789',
+             'image': 'maiev',
+             'repository': 'localhost:5000',
+             'species': 'consumer',
+             'tag': 'consumer-1.0.1',
+             'version': '1.0.1',
+             '_id': 'abcdef'},
+            {'digest': 'lolilol',
+             'image': 'maiev',
+             'repository': 'localhost:5000',
+             'species': 'producer',
+             'tag': 'producer-1.0.1',
+             'version': '1.0.1',
+             '_id': 'abcdef'
+             },
+        ]
+        overseer.scaler_docker.list_tags.return_value = ['consumer-1.0.1']
+        overseer.mongo.services.find.return_value = [service]
+        overseer.recheck_new_version()
+        overseer.dispatch.assert_called_once_with('cleaned_image', {
+            "service": filter_dict(service),
+            'image': {
+                'digest': 'lolilol',
+                'image': 'maiev',
+                'repository': 'localhost:5000',
+                'species': 'producer',
+                'tag': 'producer-1.0.1',
+                'version': '1.0.1'
+            }
+        })
+        overseer.mongo.versions.remove.assert_called_with({
+            '_id': 'abcdef'
+
+        })
+
+    def test_new_version(self, overseer: Overseer, service_data, service):
+        overseer.mongo.versions.find.return_value = [
+            {'digest': 'sha256:40c6c8b1a244746d4c351f9079848cf6325342a9023b8bf143a59201b8e0b789',
+             'image': 'maiev',
+             'repository': 'localhost:5000',
+             'species': 'producer',
+             'tag': 'producer-1.0.1',
+             'version': '1.0.1'}
+        ]
+        overseer.scaler_docker.list_tags.return_value = ['producer-1.0.1', 'producer-1.0.2']
+        overseer.mongo.services.find.return_value = [service]
+        overseer.recheck_new_version()
+        overseer.dispatch.assert_called_with('new_image', {
+            "service": filter_dict(service),
+            "image": {'repository': 'localhost:5000',
+                      'image': 'maiev',
+                      'tag': 'producer-1.0.2',
+                      'species': 'producer',
+                      'version': '1.0.2',
+                      'digest': None},
+            "scale_config": service['scale_config']
+        })
+        overseer.mongo.versions.insert.assert_called_with({
+            'repository': 'localhost:5000',
+            'image': 'maiev',
+            'tag': 'producer-1.0.2',
+            'species': 'producer',
+            'version': '1.0.2',
+            'digest': None})

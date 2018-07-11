@@ -278,4 +278,10 @@ class ImageVersion(object):
 
     @classmethod
     def deserialize(cls, data):
+        """
+
+        :param data: remake a ImageVersion from a previous «serialize» output
+        :return: a ImageVersion
+        :rtype: ImageVersion
+        """
         return cls(data)

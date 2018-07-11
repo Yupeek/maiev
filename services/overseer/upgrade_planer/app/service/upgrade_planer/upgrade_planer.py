@@ -24,11 +24,18 @@ def accept_all(version, service):
     """
     accept all version for the catalog computing
     """
-    return True
+    return version.get('available', True)
 
 
 def no_downgrade(version, service):
-    return version == 'latest' or Version.coerce(version['version']) >= Version.coerce(service['version'])
+    if version == 'latest':  # always upgrade if it's latest version available
+        return version.get('available', True)
+    new_v = Version.coerce(version['version'])
+    current_version = Version.coerce(service['version'])
+    return (
+        new_v == current_version or  # always provide current version
+        (new_v >= current_version and version.get('available', True))  # accept only if it's a upgrade to avail version
+    )
 
 
 def static_version(phase):
@@ -148,6 +155,7 @@ class UpgradePlaner(BaseWorkerService):
           version: 1.0.16
           digest: sha256:581647ffd59fc7dc9b2f164fe299de29bf99fb1cb304c41ea07d8fa3f95f052b
         full_image_id: localhost:5000/maiev:producer
+        available: true # boolean if the image is available
       scale_config:
       mode:
         name: replicated
@@ -222,7 +230,8 @@ class UpgradePlaner(BaseWorkerService):
                     service['versions'][o_version_number] = {
                         "version": o_version_number,
                         "image_info": overseer_service['image']['image_info'],
-                        "dependencies": scale_config_.get('dependencies', {})
+                        "dependencies": scale_config_.get('dependencies', {}),
+                        "available": True,
                     }
                     service['version'] = o_version_number
                     self._save_service(service)
@@ -278,7 +287,8 @@ class UpgradePlaner(BaseWorkerService):
                     version_: {
                         "version": version_,
                         "image_info": payload['service']['image']['image_info'],
-                        "dependencies": scale_config_.get('dependencies', {})
+                        "dependencies": scale_config_.get('dependencies', {}),
+                        "available": True
                     }
                 },
                 "version": version_
@@ -302,6 +312,33 @@ class UpgradePlaner(BaseWorkerService):
             self.continue_scheduled_plan(service, from_version, version_)
 
     @event_handler(
+        "overseer", "cleaned_image", handler_type=SERVICE_POOL, reliable_delivery=True
+    )
+    @log_all
+    def on_image_cleaned(self, payload):
+        """
+        triggered when the registry don't hold this version anymore.
+        we update this version to tag it as unavailable
+        :return:
+        """
+        logger.debug("cleaned image: %s", payload)
+        assert {'service', 'image'} <= set(payload), "missing data in payload: %s" % str(set(payload))
+
+        service_name_ = payload['service']['name']
+        service = self._get_service(service_name_)
+
+        version_number = payload['image']['version']
+        if service and version_number in service['versions']:
+            service['versions'][version_number]['available'] = False
+            self._save_service(service)
+            logger.debug("version %s of service %s tagged as unavailable", version_number, service_name_)
+            if service['version'] == version_number:
+                # this is the running process wihch don't have the image anymore
+                logger.warning("currently running image %s was deleted from the repository. "
+                               "the service %s will be unable to launch new instance without this image.",
+                               payload['image'], service_name_)
+
+    @event_handler(
         "overseer", "new_image", handler_type=SERVICE_POOL, reliable_delivery=True
     )
     @log_all
@@ -317,7 +354,7 @@ class UpgradePlaner(BaseWorkerService):
         scale_config_ = payload['scale_config'] or {}
         if service:
             existing_version = service['versions'].get(version_number)
-            if existing_version and \
+            if existing_version and existing_version['available'] and \
                     existing_version.get('dependencies') == scale_config_.get('dependencies'):
                 return  # same image for same dep: this is same call for same image
         else:
@@ -331,7 +368,8 @@ class UpgradePlaner(BaseWorkerService):
         new_version = service['versions'][version_number] = {
             "version": version_number,
             "image_info": payload['image'],
-            "dependencies": scale_config_.get('dependencies', {})
+            "dependencies": scale_config_.get('dependencies', {}),
+            "available": True
         }
 
         self._save_service(service)
@@ -619,6 +657,9 @@ class UpgradePlaner(BaseWorkerService):
                         "provide": version['dependencies'].get('provide', {}),
                         "require": version['dependencies'].get('require', []),
                     }
+            if len(versions) == 0:
+                logger.warning("all %d versions was filtered out by filter %s for service %s",
+                               len(service['versions']), filter_name, service['name'])
         return res
 
     def solve_best_phase(self, phases):
