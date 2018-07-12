@@ -81,7 +81,7 @@ jobs:
         - IMAGE_VERSION=latest make deploy
         - docker tag yupeek/maiev:global-latest yupeek/maiev:latest
         - docker push yupeek/maiev:latest
-      if: branch = master AND tag IS present
+      if: tag IS present
 
 script:
   - make test -C services/$SERVICE
