@@ -2,14 +2,117 @@
   "min": 1,
   "max": 1,
   "dependencies": {
-    "require": [
-      "producer:rpc:echo",
-      "\"*args\" in producer:rpc:echo:args"
-    ],
     "provide": {
-
-    }
-  },
-  "metric": [
-  ]
+      "dependency_solver:rpc:solve_dependencies": 1,
+      "dependency_solver:rpc:solve_dependencies:args": [
+        "catalog",
+        "extra_constraints"
+      ],
+      "dependency_solver:rpc:solve_dependencies:rtype": [
+        "list"
+      ],
+      "dependency_solver:rpc:explain": 1,
+      "dependency_solver:rpc:explain:args": [
+        "catalog",
+        "extra_constraints"
+      ],
+      "dependency_solver:rpc:explain:rtype": [
+        "results"
+      ],
+      "upgrade_planer:event:new_version": 1,
+      "upgrade_planer:rpc:list_catalog": 1,
+      "upgrade_planer:rpc:explain_phase": 1,
+      "upgrade_planer:rpc:get_latest_phase": 1,
+      "upgrade_planer:rpc:run_available_upgrade": 1,
+      "upgrade_planer:rpc:continue_scheduled_plan": 1,
+      "upgrade_planer:rpc:resolve_upgrade_and_steps": 1,
+      "overseer:rpc": 1,
+      "overseer:rpc:scale": 1,
+      "overseer:rpc:monitor": 1,
+      "overseer:rpc:list_service": 1,
+      "overseer:rpc:get_service": 1,
+      "overseer:rpc:unmonitor_service": 1,
+      "overseer:rpc:test": 1,
+      "overseer:rpc:upgrade_service": 1,
+      "overseer:event:service_updated": 1,
+      "overseer:event:new_image": 1,
+      "load_manager:rpc:monitor_service": 1,
+      "load_manager:rpc:unmonitor_service": 1,
+      "load_manager:event:scale": 1,
+      "load_manager:event:scale:params": [
+        "scale",
+        "extra_constraints"
+      ],
+      "scaler_docker:http": 1,
+      "scaler_docker:event:service_updated": 1,
+      "scaler_docker:event:image_updated": 1,
+      "scaler_docker:rpc:update": 1,
+      "scaler_docker:rpc:get": 1,
+      "scaler_docker:rpc:list_services": 1,
+      "scaler_docker:rpc:fetch_image_config": 1,
+      "monitorer:rabbitmq": true,
+      "monitorer_rabbitmq:event:metrics_updated": 2,
+      "monitorer_rabbitmq:event:metrics_updated:params": [
+        "monitorer",
+        "identifier",
+        "metrics",
+        "metrics.exists",
+        "metrics.waiting",
+        "metrics.latency",
+        "metrics.rate",
+        "metrics.call_rate",
+        "metrics.exec_rate",
+        "metrics.consumers"
+      ],
+      "monitorer_rabbitmq:rpc:track": 1,
+      "monitorer_rabbitmq:rpc:track:args": [
+        "queue_identifier"
+      ],
+      "trigger:rpc:compute": 1,
+      "trigger:rpc:compute:args": [
+        "ruleset"
+      ],
+      "trigger:rpc:add": 1,
+      "trigger:rpc:add:args": [
+        "ruleset"
+      ],
+      "trigger:rpc:delete": 1,
+      "trigger:rpc:delete:args": [
+        "owner",
+        "rule_name"
+      ],
+      "trigger:rpc:purge": 1,
+      "trigger:rpc:purge:args": [
+        "owner"
+      ],
+      "trigger:rpc:list": 1,
+      "trigger:rpc:list:args": [
+        "_filter"
+      ],
+      "trigger:event:ruleset_triggered": 1,
+      "trigger:event:ruleset_triggered:params": [
+        "ruleset",
+        "rules_stats"
+      ]
+    },
+    "require": [
+      "dependency_solver:rpc:explain > 0",
+      "dependency_solver:rpc:solve_dependencies > 0",
+      "overseer:rpc:get_service > 0",
+      "overseer:rpc:upgrade_service > 0",
+      "overseer:event:service_updated > 0",
+      "overseer:event:new_image > 0",
+      "scaler_docker:rpc:fetch_image_config > 0",
+      "scaler_docker:rpc:list_services > 0",
+      "scaler_docker:rpc:update > 0",
+      "load_manager:rpc:monitor_service > 0",
+      "overseer:rpc:scale > 0",
+      "trigger:rpc:delete > 0",
+      "trigger:rpc:compute > 0",
+      "trigger:rpc:add > 0",
+      "overseer:event:service_updated > 0",
+      "\"metrics.exists\" in monitorer_rabbitmq:event:metrics_updated:params",
+      "monitorer_rabbitmq:rpc:track >= 1"
+    ]
+  }
 }

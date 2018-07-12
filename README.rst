@@ -46,7 +46,7 @@ current delevoppement status:
   - dependency requirement: ok
   - helped deployments: no
 
-- monitoring/autoscaling 85%
+- monitoring/autoscaling 100%
 
   - rules parsing: ok
   - services custom rules: ok
@@ -60,3 +60,30 @@ current delevoppement status:
   - webui for crud: no
   - live status in webui: no
 
+
+run it now
+==========
+
+with a docker swarm setup, you can do this:
+
+.. code-block:: bash
+
+    MAIEVPASSWD='mycommonpassword'
+    # docker login to access private repository
+    cat ~/.docker/config.json | docker secret create maiev_docker_cred.json -
+
+    docker service create \
+        --name maiev \
+        --mount type=bind,src=//var/run/docker.sock,dst=/var/run/docker.sock \
+        -e RABBITMQ_HOST=rabbitmq.myservices.com \
+        -e RABBITMQ_VHOST=/maiev \
+        -e RABBITMQ_USER=maiev \
+        -e RABBITMQ_PASSWORD=$MAIEVPASSWD \
+        -e MONGO_URIS=mongodb://maive:$MAIEVPASSWD@mongodb.myservices.com/overseer \
+        --secret source=maiev_docker_cred.json,target=/home/service/.docker/config.json \
+        --publish 80:8000 \
+        --constraint 'node.role == manager' \
+        yupeek/maiev:global-latest
+
+this will start maiev. it will query all existings services to start monitoring each one which has the
+command «scaler_info».

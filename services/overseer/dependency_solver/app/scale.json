@@ -7,7 +7,10 @@
     "provide": {
       "dependency_solver:rpc:solve_dependencies": 1,
       "dependency_solver:rpc:solve_dependencies:args": ["catalog", "extra_constraints"],
-      "dependency_solver:rpc:solve_dependencies:rtype": ["list"]
+      "dependency_solver:rpc:solve_dependencies:rtype": ["list"],
+      "dependency_solver:rpc:explain": 1,
+      "dependency_solver:rpc:explain:args": ["catalog", "extra_constraints"],
+      "dependency_solver:rpc:explain:rtype": ["results"]
     },
     "optional": [
     ]

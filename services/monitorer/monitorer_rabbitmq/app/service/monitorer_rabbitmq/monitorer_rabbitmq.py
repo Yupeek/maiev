@@ -25,7 +25,7 @@ class MonitorerRabbitmq(BaseWorkerService):
 
     - metric_updated(): Service
 
-    rcp
+    rpc
     ###
 
     track(identifier)

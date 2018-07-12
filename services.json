@@ -70,7 +70,6 @@
         "-v", "{root}/services/maiev-base/app/common/:/app/common:ro",
         "{run_dev}",
         "{service_binding}",
-
         "-v", "{current_dir}/app/scale.json:/app/scale.json:ro",
         "{extra_volume}",
         "-e", "SERVICE_NAME={service_name}",

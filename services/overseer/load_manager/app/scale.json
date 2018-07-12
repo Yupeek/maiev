@@ -3,14 +3,15 @@
   "max": 10,
   "dependencies": {
     "require": [
-      "overseer:rpc:scale",
-      "\"scale\" in overseer:rpc:scale:args",
-      "trigger:rpc:delete",
-      "{\"owner\", \"rule_name\"} in trigger:rpc:delete:args",
-      "overseer:event:service_updated",
-      "{\"diff\", \"service\"} in overseer:event:service_updated:params"
+      "overseer:rpc:scale > 0",
+      "trigger:rpc:delete > 0",
+      "trigger:rpc:compute > 0",
+      "trigger:rpc:add > 0",
+      "overseer:event:service_updated > 0"
     ],
     "provide": {
+      "load_manager:rpc:monitor_service": 1,
+      "load_manager:rpc:unmonitor_service": 1,
       "load_manager:event:scale": 1,
       "load_manager:event:scale:params": ["scale", "extra_constraints"]
     },

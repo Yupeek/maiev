@@ -2,7 +2,6 @@
 import datetime
 import json
 import logging
-import pprint
 
 import docker.errors
 from docker.types.services import ServiceMode
@@ -14,6 +13,7 @@ from common.dependency import PoolProvider
 from common.entrypoint import once
 from common.utils import log_all
 from service.dependency.docker import DockerClientProvider
+from service.scaler_docker.registry import Registry
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +112,7 @@ class ScalerDocker(object):
 
     None
 
-    rcp
+    rpc
     ###
 
     fetch_image_config(image_name: str): ScaleConfig
@@ -178,7 +178,6 @@ class ScalerDocker(object):
                     'service': self.get(service_id=event['Actor']['ID']),
                     'attributes': event['Actor']['Attributes'],
                 })
-                pprint.pprint(event)
 
     # ####################################################
     #  RPC endpoints
@@ -251,6 +250,16 @@ class ScalerDocker(object):
             except json.JSONDecodeError:
                 logger.exception("docker image %s has invalide scale_info output", image_full_id)
                 return None
+
+    @rpc
+    @log_all
+    def list_tags(self, image_full_id):
+        if isinstance(image_full_id, dict):
+            # we got all decomposed data.
+            image_full_id = image_full_id.get('image_full_id', None) or recompose_full_id(image_full_id)
+        r = Registry()
+        logger.debug("interogating registry for tags in %s", image_full_id)
+        return r.list_tags(image_full_id)
 
     # ####################################################
     #                 PRIVATE
