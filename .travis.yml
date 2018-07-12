@@ -66,7 +66,7 @@ jobs:
         - TARGET=global make build-image
         - make build-image
         - make deploy
-      if: branch = develop
+      if: branch = develop AND type = push
 
     # we push to production if this is a master branch tagged
     - stage: production
@@ -81,7 +81,7 @@ jobs:
         - IMAGE_VERSION=latest make deploy
         - docker tag yupeek/maiev:global-latest yupeek/maiev:latest
         - docker push yupeek/maiev:latest
-      if: branch = master AND env(TRAVIS_TAG) IS present
+      if: branch = master AND tag IS present
 
 script:
   - make test -C services/$SERVICE
