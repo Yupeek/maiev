@@ -65,7 +65,7 @@ jobs:
         - TARGET=latest make -C services/maiev-base build-image
         - TARGET=global make build-image
         - make build-image
-        - make deploy
+        - make deploy -C global
       if: branch = develop AND type = push
 
     # we push to production if this is a master branch tagged
