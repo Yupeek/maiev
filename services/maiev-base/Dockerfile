@@ -16,7 +16,7 @@ ARG GROUPID=$USERID
 RUN addgroup -g $GROUPID service;  adduser -D -u $USERID -G $(getent group $GROUPID | cut -d: -f1) service
 RUN chown $USERID:$GROUPID /app
 
-RUN apk add --no-cache gcc linux-headers musl-dev nodejs
+RUN apk add --no-cache gcc linux-headers musl-dev nodejs npm
 COPY ./app/extra_package/ /app/extra_package/
 COPY ./app/requirements.txt ./app/extra_package/ /app/
 RUN cd /app; pip3 install -r requirements.txt && rm requirements.txt

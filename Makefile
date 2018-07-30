@@ -48,3 +48,7 @@ update-global-dep:
 
 dev:
 	TARGET=dev $(MAKE) build-image
+
+global:
+	TARGET=global $(MAKE) build-image
+	$(MAKE) -C global build-image
