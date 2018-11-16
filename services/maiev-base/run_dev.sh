@@ -41,7 +41,16 @@ asyncRun() {
     done
 }
 
-CLASS_NAME=$(python -c "import service.${SERVICE_NAME}.${SERVICE_NAME} as m; print([n for n in dir(m) if getattr(getattr(m, n), 'name', '').endswith('${SERVICE_NAME}')][0])")
+
+CLASS_NAME=$(python -c "
+import service.${SERVICE_NAME}.${SERVICE_NAME} as m
+service_name='${SERVICE_NAME}'
+
+for varname, var in m.__dict__.items():
+	if not varname.startswith('_') and isinstance(var, type) and getattr(var, 'name', '').endswith(service_name):
+		print(varname)
+		break
+")
 
 echo "running ${GREEN}service.${SERVICE_NAME}.${SERVICE_NAME}.${CLASS_NAME}${RESTORE}"
 

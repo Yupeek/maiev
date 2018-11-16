@@ -11,3 +11,5 @@ pytest
 pytest-cov
 isort
 flake8
+
+python_logstash_async==1.1.0
