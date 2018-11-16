@@ -2,12 +2,13 @@
 import logging
 from logging import Filter
 
+from logstash_async.formatter import LOGSTASH_MESSAGE_FIELD_LIST, LogstashFormatter
+
 try:
     import ujson as json
 except ImportError:
     import json
 
-from logstash_async.formatter import LogstashFormatter, LOGSTASH_MESSAGE_FIELD_LIST
 
 logger = logging.getLogger(__name__)
 

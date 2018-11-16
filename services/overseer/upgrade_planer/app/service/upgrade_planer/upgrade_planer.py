@@ -32,10 +32,11 @@ def no_downgrade(version, service):
         return version.get('available', True)
     new_v = Version.coerce(version['version'])
     current_version = Version.coerce(service['version'])
-    return (
-        new_v == current_version or  # always provide current version
-        (new_v >= current_version and version.get('available', True))  # accept only if it's a upgrade to avail version
-    )
+
+    # always provide current version
+    # or new version is an upgrade and is availble
+    return new_v == current_version \
+        or (new_v >= current_version and version.get('available', True))
 
 
 def static_version(phase):

@@ -1,6 +1,7 @@
 
 FROM python:3.6-alpine
 
+LABEL stdout-format=python-json
 
 ENV PYTHONPATH=/app
 ENV RABBITMQ_USER guest
