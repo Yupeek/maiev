@@ -79,7 +79,7 @@ jobs:
         - make build-image
         - IMAGE_VERSION=${TRAVIS_TAG} make deploy
         - IMAGE_VERSION=latest make deploy
-        - docker tag yupeek/maiev:global-latest yupeek/maiev:latest
+        - docker tag yupeek/maiev:global-${TRAVIS_TAG} yupeek/maiev:latest
         - docker push yupeek/maiev:latest
       if: tag IS present
 
