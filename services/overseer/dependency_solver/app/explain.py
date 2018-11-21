@@ -2,6 +2,7 @@
 import json
 import logging
 import sys
+import traceback
 
 from booleano.exc import ScopeError
 
@@ -50,8 +51,8 @@ def explain_stdin():
     if not catalog:
         raise Exception('bad formated catalog')
 
-    s = Solver(catalog, (), debug=True)
     try:
+        s = Solver(catalog, (), debug=True)
         return {
             "fail_count": s.explain(),
             "errors": [],
@@ -69,6 +70,21 @@ def explain_stdin():
                  "str": str(e)
                  }
             ]
+        }
+    except Exception as e:
+        traceback.print_exc(file=sys.stderr)
+        return {
+            "fail_count": None,
+            "anomalies": None,
+            "failed": None,
+            "errors": [
+                {"type": type(e).__name__,
+                 "str": str(e)
+                 }
+            ],
+            "debug": {
+                "catalog": catalog
+            }
         }
 
 

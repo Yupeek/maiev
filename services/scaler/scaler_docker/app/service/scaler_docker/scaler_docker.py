@@ -248,7 +248,7 @@ class ScalerDocker(object):
             try:
                 return json.loads(result)
             except json.JSONDecodeError:
-                logger.exception("docker image %s has invalide scale_info output", image_full_id)
+                logger.exception("docker image %s has invalide scale_info output: %s", image_full_id, result)
                 return None
 
     @rpc
