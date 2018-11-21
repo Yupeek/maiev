@@ -57,7 +57,7 @@ def event_payload():
                         'mode': {'name': 'replicated', 'replicas': 23},
                         'name': 'producer',
                         'scale_config': None,
-                        'start_conig': {'env': {}, 'secret': []}}}
+                        'start_config': {'env': {}, 'secret': []}}}
 
 
 @pytest.fixture

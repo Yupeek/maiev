@@ -378,7 +378,7 @@ class Overseer(BaseWorkerService):
                 'full_image_id': image_version.image_id,
             },
             "scale_config": config,
-            "start_conig": {
+            "start_config": {
                 "env": service_data.get('env', {}),
                 "secret": [],
             },
