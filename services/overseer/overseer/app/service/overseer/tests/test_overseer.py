@@ -38,7 +38,7 @@ class TestOverseerUpdateImage(TestCase):
         'mode': {'name': 'replicated', 'replicas': 0},
         'name': 'producer',
         'scale_config': None,
-        'start_conig': {'env': {}, 'secret': []}
+        'start_config': {'env': {}, 'secret': []}
     }
 
     def test_unknown_image(self):
@@ -143,7 +143,7 @@ def service():
                                    'scale_down': 'rules:stable_latency',
                                    'scale_up': 'rules:panic or (rmq:consumers == 0 '
                                                'and rmq:waiting > 0)'}},
-        'start_conig': {'env': {}, 'secret': []}}
+        'start_config': {'env': {}, 'secret': []}}
 
 
 class TestServiceUpdatePropagation(object):

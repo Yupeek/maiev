@@ -132,7 +132,7 @@ class ImageVersion(object):
     this support for sub-image consideration in the tag (repo/globalservice:subservice-version)
 
     """
-    _VERSION_REGEXP = '(\d+)(?:\.(\d+)(?:\.(\d+))?)?(?:([0-9a-zA-Z.]*))?(?:\+([0-9a-zA-Z.]*))?'
+    _VERSION_REGEXP = r'(\d+)(?:\.(\d+)(?:\.(\d+))?)?(?:([0-9a-zA-Z.]*))?(?:\+([0-9a-zA-Z.]*))?'
     tag_regex = re.compile('^((?P<version>%s|latest)|-|(?P<species>[a-zA-Z_]+))+$' % _VERSION_REGEXP)
     """
     the rexexp to parse the tage: see https://regex101.com/r/o2hr5V/3
@@ -196,9 +196,9 @@ class ImageVersion(object):
         """
         d, o = self.data, other.data
         return (
-            d['repository'] == o['repository'] and
-            d['image'] == o['image'] and
-            d['species'] == o['species']
+            d['repository'] == o['repository']
+            and d['image'] == o['image']
+            and d['species'] == o['species']
         )
 
     def __eq__(self, other):
@@ -217,13 +217,13 @@ class ImageVersion(object):
         sv = self.data['version']
         ov = other.data['version']
         return (
-            self.is_same_image(other) and
-            sv is not None and
-            ov is not None and
-            sv != 'latest' and
-            (
-                ov == 'latest' or
-                self.version < other.version
+            self.is_same_image(other)
+            and sv is not None
+            and ov is not None
+            and sv != 'latest'
+            and (
+                ov == 'latest'
+                or self.version < other.version
             )
         )
 
@@ -231,12 +231,12 @@ class ImageVersion(object):
         sv = self.data['version']
         ov = other.data['version']
         return (
-            self.is_same_image(other) and
-            sv is not None and
-            ov is not None and
-            (
-                sv == 'latest' or
-                self.version > other.version
+            self.is_same_image(other)
+            and sv is not None
+            and ov is not None
+            and (
+                sv == 'latest'
+                or self.version > other.version
             )
         )
 

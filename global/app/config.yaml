@@ -6,6 +6,7 @@ MONITORED_SERVER_URL: ${MONITORED_SERVER_URL}
 serializer: json_datecompatible
 max_workers: ${NAMEKO_MAX_WORKERS:10}
 
+
 LOGGING:
   version: 1
   formatters:
@@ -15,10 +16,17 @@ LOGGING:
       format: "\u001B[1;33m%(levelname)s\u001B[0m [\u001B[1;31m%(name)s\
         \u001B[0m:\u001B[1;32m%(lineno)s\
         \u001B[0m:\u001B[1;35m%(funcName)s\u001B[0m] \u001B[1;37m%(message)s\u001B[0m"
+    json:
+      (): common.logging.JsonFormatter
+      extra_prefix: app
   handlers:
     console:
       class: logging.StreamHandler
       formatter: colored
+      filters: ${CONSOLE_LOG_FILTERS:[]}
+    logspout:
+      class: logging.StreamHandler
+      formatter: json
       filters: ${CONSOLE_LOG_FILTERS:[]}
   filters:
     filtergetroot:
@@ -26,16 +34,16 @@ LOGGING:
   loggers:
     root:
       level: ${ROOT_LOG_LEVEL:CRITICAL}
-      handlers: [console]
+      handlers: ${LOG_HANDLERS:[console]}
     service:
       level: DEBUG
-      handlers: [console]
+      handlers: ${LOG_HANDLERS:[console]}
       propagate: false
     components:
       level: DEBUG
-      handlers: [console]
+      handlers: ${LOG_HANDLERS:[console]}
       propagate: false
     nameko:
       level: ${NAMEKO_LOG_LEVEL:ERROR}
-      handlers: [console]
+      handlers: ${LOG_HANDLERS:[console]}
       propagate: false
