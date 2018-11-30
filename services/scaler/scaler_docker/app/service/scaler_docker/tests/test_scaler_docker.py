@@ -63,7 +63,7 @@ class ScalerDockerTestCase(unittest.TestCase):
     def test_push_notification(self):
         pool = eventlet.greenpool.GreenPool(1)
         fake_provider = mock.MagicMock(DockerClient)
-        fake_provider.containers.run.return_value = b'{}'
+        fake_provider.containers.run.return_value.logs.return_value = b'{}'
 
         service = worker_factory(ScalerDocker, pool=pool, docker=fake_provider)  # type: ScalerDocker
         request = mock.Mock()
@@ -88,7 +88,7 @@ class ScalerDockerTestCase(unittest.TestCase):
     def test_push_notification_from_hub(self):
         pool = eventlet.greenpool.GreenPool(1)
         fake_provider = mock.MagicMock(DockerClient)
-        fake_provider.containers.run.return_value = b'{}'
+        fake_provider.containers.run.return_value.logs.return_value = b'{}'
 
         service = worker_factory(ScalerDocker, pool=pool, docker=fake_provider)  # type: ScalerDocker
         request = mock.Mock()
@@ -111,8 +111,17 @@ class ScalerDockerTestCase(unittest.TestCase):
 
     def test_fetch_scale_config(self):
         fake_provider = mock.MagicMock(DockerClient)
-        fake_provider.containers.run.return_value = b'{}'
+        fake_provider.containers.run.return_value.logs.return_value = b'{}'
 
         service = worker_factory(ScalerDocker, docker=fake_provider)  # type: ScalerDocker
         service.fetch_image_config('nginx')
-        fake_provider.containers.run.assert_called_once_with('nginx', 'scale_info', remove=True)
+        fake_provider.containers.run.assert_called_once_with('nginx', 'scale_info', remove=False, detach=True)
+
+    def test_bad_scale_config(self):
+        fake_provider = mock.MagicMock(DockerClient)
+        fake_provider.containers.run.return_value.logs.return_value = b'{'
+
+        service = worker_factory(ScalerDocker, docker=fake_provider)  # type: ScalerDocker
+        with self.assertLogs(None, 'ERROR'):
+            res = service.fetch_image_config('nginx')
+        self.assertIsNone(res)
