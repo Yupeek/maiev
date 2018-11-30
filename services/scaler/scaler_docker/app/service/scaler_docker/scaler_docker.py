@@ -2,6 +2,7 @@
 import datetime
 import json
 import logging
+import time
 
 import docker.errors
 from docker.types.services import ServiceMode
@@ -241,7 +242,12 @@ class ScalerDocker(BaseWorkerService):
             # we got all decomposed data.
             image_full_id = image_full_id.get('image_full_id', None) or recompose_full_id(image_full_id)
         try:
-            result = self.docker.containers.run(image_full_id, 'scale_info', remove=True).decode('utf-8')
+            container = self.docker.containers.run(image_full_id, 'scale_info', remove=False, detach=True)
+            # tricks to make sure the container has flushed stdout and we got all data
+            container.logs(follow=True).decode('utf-8')
+            container.stop()
+            result = container.logs(follow=True).decode('utf-8')
+            container.remove()
         except (docker.errors.NotFound, docker.errors.ContainerError) as e:
             if "executable file not found in " not in str(e):
                 logger.debug("extra error for scaler_info", exc_info=True)
