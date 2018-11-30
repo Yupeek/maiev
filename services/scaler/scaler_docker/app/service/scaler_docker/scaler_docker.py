@@ -9,6 +9,7 @@ from nameko.events import EventDispatcher
 from nameko.rpc import rpc
 from nameko.web.handlers import http
 
+from common.base import BaseWorkerService
 from common.dependency import PoolProvider
 from common.entrypoint import once
 from common.utils import log_all
@@ -98,7 +99,7 @@ def recompose_full_id(decomposed):
     return res
 
 
-class ScalerDocker(object):
+class ScalerDocker(BaseWorkerService):
     """
     the docker swarm adapter
 
@@ -137,6 +138,7 @@ class ScalerDocker(object):
     # ####################################################
 
     @http('GET', '/')
+    @rpc
     def ping(self, request):
         return 'OK'
 
@@ -248,7 +250,7 @@ class ScalerDocker(object):
             try:
                 return json.loads(result)
             except json.JSONDecodeError:
-                logger.exception("docker image %s has invalide scale_info output: %s", image_full_id, result)
+                logger.exception("docker image %s has invalide scale_info output: %r", image_full_id, result)
                 return None
 
     @rpc

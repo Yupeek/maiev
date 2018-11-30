@@ -28,10 +28,13 @@ def accept_all(version, service):
 
 
 def no_downgrade(version, service):
-    if version == 'latest':  # always upgrade if it's latest version available
+    if version == 'latest' or version['version'] == 'latest':  # always upgrade if it's latest version available
         return version.get('available', True)
+    if service['version'] == 'latest':
+        return False
     new_v = Version.coerce(version['version'])
     current_version = Version.coerce(service['version'])
+
 
     # always provide current version
     # or new version is an upgrade and is availble
@@ -210,6 +213,7 @@ class UpgradePlaner(BaseWorkerService):
     # ####################################################
 
     @once
+    @rpc
     @log_all
     def sanity_check(self):
         """
@@ -266,11 +270,13 @@ class UpgradePlaner(BaseWorkerService):
         :param payload:
         :return:
         """
+        logger.debug("got notified by overseer.service_updated: %s", payload)
         assert {'service', 'diff'} <= set(payload), "missing data in payload: %s" % str(set(payload))
 
         service_name_ = payload['service']['name']
         service = self._get_service(service_name_)
         version_ = payload['service']['image']['image_info']['version']
+        logger.info("new service deployed %s=%s", service_name_, version_)
         if service:
             service['service'] = payload['service']
             from_version = service['version']
@@ -406,6 +412,21 @@ class UpgradePlaner(BaseWorkerService):
 
     @rpc
     @log_all
+    def list_scheduling(self, filter_=None):
+        filter_ = filter_ or {}
+
+        return [filter_dict(s) for s in self.mongo.scheduling.find(filter_)]
+
+    @rpc
+    @log_all
+    def list_phases(self, filter_=None):
+        filter_ = filter_ or {}
+
+        return [filter_dict(s) for s in self.mongo.scheduling.find(filter_)]
+
+
+    @rpc
+    @log_all
     def explain_phase(self, phase: dict):
         """
         explain a phase and return if it's available or not, and if not why.
@@ -509,20 +530,23 @@ class UpgradePlaner(BaseWorkerService):
                 next_step = step
                 break
 
+        logger.debug("scheduling: updated_step=%s, next_step=%s", updated_step, next_step)
         if updated_step is None:
             # we did not find the current service in the scheduled plan...
             # this mean our upgrade plan is over and aborded since it's out of sync with upgrade process
+            logger.info("abording old scheduling %s", running_scheduled)
             _abord_scheduled(running_scheduled)
 
         elif next_step is None:
             # the last service was the current one.
             # this upgrade is done
+            logger.info("scheduling is finished %s", running_scheduled)
             updated_step['state'] = DONE
             running_scheduled['state'] = DONE
         else:
             # we are still in a upgrade plan
             updated_step['state'] = DONE
-
+            logger.info("scheduling continue with step %s", next_step)
             self._run_step(next_step, running_scheduled)
 
         self.mongo.scheduling.replace_one({'_id': running_scheduled['_id']}, running_scheduled)
