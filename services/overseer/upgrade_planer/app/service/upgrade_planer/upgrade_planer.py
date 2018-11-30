@@ -35,7 +35,6 @@ def no_downgrade(version, service):
     new_v = Version.coerce(version['version'])
     current_version = Version.coerce(service['version'])
 
-
     # always provide current version
     # or new version is an upgrade and is availble
     return new_v == current_version \
@@ -423,7 +422,6 @@ class UpgradePlaner(BaseWorkerService):
         filter_ = filter_ or {}
 
         return [filter_dict(s) for s in self.mongo.scheduling.find(filter_)]
-
 
     @rpc
     @log_all

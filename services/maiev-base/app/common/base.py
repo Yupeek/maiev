@@ -57,7 +57,7 @@ class BaseWorkerService(object):
                     k
                     for k, v in sig.parameters.items()
                     if v.kind in _keeps and k != 'self'
-               ]
+                ]
             except Exception:
                 logger.exception()
             return ret
