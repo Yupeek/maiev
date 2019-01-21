@@ -277,11 +277,13 @@ class UpgradePlaner(BaseWorkerService):
         version_ = payload['service']['image']['image_info']['version']
         logger.info("new service deployed %s=%s", service_name_, version_)
         if service:
-            service['service'] = payload['service']
             from_version = service['version']
             if from_version == version_:
                 # this is a false positive, since the current version is already the reported one...
+                logger.debug("this is a false positive. version %s for service is already dispatched",
+                             from_version, service)
                 return
+            service['service'] = payload['service']
             service['version'] = version_
         else:
             from_version = None
@@ -421,7 +423,7 @@ class UpgradePlaner(BaseWorkerService):
     def list_phases(self, filter_=None):
         filter_ = filter_ or {}
 
-        return [filter_dict(s) for s in self.mongo.scheduling.find(filter_)]
+        return [filter_dict(s) for s in self.mongo.phases.find(filter_)]
 
     @rpc
     @log_all
