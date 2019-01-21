@@ -175,8 +175,10 @@ class ScalerDocker(BaseWorkerService):
     @once
     @log_all
     def start_listen_events(self):
+        logger.debug("start listening for docker events")
         for event in self.docker.events(since=datetime.datetime.now(), decode=True):
             if event['Action'] == 'update':
+                logger.debug("dispatching new update event: %s" % event['Actor']['Attributes'])
                 self.dispatch('service_updated', {
                     'service': self.get(service_id=event['Actor']['ID']),
                     'attributes': event['Actor']['Attributes'],
