@@ -265,7 +265,8 @@ class UpgradePlaner(BaseWorkerService):
     @log_all
     def on_service_deployed(self, payload):
         """
-        a new version of the current service is deployed
+        a new version of the current service is deployed. this event is triggered many times since
+        a seervice can be updated with his: image,state,replica, etc
         :param payload:
         :return:
         """
@@ -278,11 +279,7 @@ class UpgradePlaner(BaseWorkerService):
         logger.info("new service deployed %s=%s", service_name_, version_)
         if service:
             from_version = service['version']
-            if from_version == version_:
-                # this is a false positive, since the current version is already the reported one...
-                logger.debug("this is a false positive. version %s for service is already dispatched",
-                             from_version, service)
-                return
+            upsert = from_version != version_
             service['service'] = payload['service']
             service['version'] = version_
         else:
@@ -301,18 +298,20 @@ class UpgradePlaner(BaseWorkerService):
                 },
                 "version": version_
             }
-        self._save_service(service)
+            upsert = True
+        if upsert:
+            self._save_service(service)
 
-        self.mongo.phases.insert_one({
-            "updated": service['name'],
-            "from": from_version,
-            "to": version_,
-            "services": {
-                s['name']: s['version']
-                for s in self.mongo.catalog.find()
-            },
-            "date": datetime.datetime.now()
-        })
+            self.mongo.phases.insert_one({
+                "updated": service['name'],
+                "from": from_version,
+                "to": version_,
+                "services": {
+                    s['name']: s['version']
+                    for s in self.mongo.catalog.find()
+                },
+                "date": datetime.datetime.now()
+            })
 
         # we just handle finished changes: complited event or update of 0 replicas service
         if payload['diff'].get('state', {}).get('to') == 'completed' or \
