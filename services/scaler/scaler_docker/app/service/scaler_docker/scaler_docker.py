@@ -2,6 +2,7 @@
 import datetime
 import json
 import logging
+import time
 
 import docker.errors
 from docker.types.services import ServiceMode
@@ -9,6 +10,7 @@ from nameko.events import EventDispatcher
 from nameko.rpc import rpc
 from nameko.web.handlers import http
 
+from common.base import BaseWorkerService
 from common.dependency import PoolProvider
 from common.entrypoint import once
 from common.utils import log_all
@@ -98,7 +100,7 @@ def recompose_full_id(decomposed):
     return res
 
 
-class ScalerDocker(object):
+class ScalerDocker(BaseWorkerService):
     """
     the docker swarm adapter
 
@@ -137,6 +139,7 @@ class ScalerDocker(object):
     # ####################################################
 
     @http('GET', '/')
+    @rpc
     def ping(self, request):
         return 'OK'
 
@@ -172,8 +175,10 @@ class ScalerDocker(object):
     @once
     @log_all
     def start_listen_events(self):
+        logger.debug("start listening for docker events")
         for event in self.docker.events(since=datetime.datetime.now(), decode=True):
             if event['Action'] == 'update':
+                logger.debug("dispatching new update event: %s" % event['Actor']['Attributes'])
                 self.dispatch('service_updated', {
                     'service': self.get(service_id=event['Actor']['ID']),
                     'attributes': event['Actor']['Attributes'],
@@ -239,7 +244,12 @@ class ScalerDocker(object):
             # we got all decomposed data.
             image_full_id = image_full_id.get('image_full_id', None) or recompose_full_id(image_full_id)
         try:
-            result = self.docker.containers.run(image_full_id, 'scale_info', remove=True).decode('utf-8')
+            container = self.docker.containers.run(image_full_id, 'scale_info', remove=False, detach=True)
+            # tricks to make sure the container has flushed stdout and we got all data
+            container.logs(follow=True).decode('utf-8')
+            container.stop()
+            result = container.logs(follow=True).decode('utf-8')
+            container.remove()
         except (docker.errors.NotFound, docker.errors.ContainerError) as e:
             if "executable file not found in " not in str(e):
                 logger.debug("extra error for scaler_info", exc_info=True)
@@ -248,7 +258,7 @@ class ScalerDocker(object):
             try:
                 return json.loads(result)
             except json.JSONDecodeError:
-                logger.exception("docker image %s has invalide scale_info output: %s", image_full_id, result)
+                logger.exception("docker image %s has invalide scale_info output: %r", image_full_id, result)
                 return None
 
     @rpc

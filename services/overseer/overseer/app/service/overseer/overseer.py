@@ -262,7 +262,9 @@ class Overseer(BaseWorkerService):
         diff = self._compute_diff(service_data, service, attributes)
         scaler = self._get_scaler(service)
         self._save_service_state(service_data, scaler, service)
+        logger.debug("found diff for this update: %s", diff)
         if diff:
+            logger.debug("dispatching service_updated: %s", filter_dict(service))
             self.dispatch('service_updated', {"service": filter_dict(service), "diff": diff})
 
     @event_handler(
