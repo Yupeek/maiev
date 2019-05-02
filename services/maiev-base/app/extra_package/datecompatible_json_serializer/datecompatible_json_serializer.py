@@ -14,14 +14,14 @@ logger = logging.getLogger(__name__)
 class DateCompatibleJSONEncode(json.JSONEncoder):
     def default(self, obj):
 
-        if isinstance(obj, datetime.date):
-            return {
-                '__type__': '__date__',
-                'epoch': int(mktime(obj.timetuple()))
-            }
-        elif isinstance(obj, datetime.datetime):
+        if isinstance(obj, datetime.datetime):
             return {
                 '__type__': '__datetime__',
+                'epoch': int(mktime(obj.timetuple()))
+            }
+        elif isinstance(obj, datetime.date):
+            return {
+                '__type__': '__date__',
                 'epoch': int(mktime(obj.timetuple()))
             }
         else:

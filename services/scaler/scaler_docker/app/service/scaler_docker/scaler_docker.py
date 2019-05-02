@@ -2,13 +2,17 @@
 import datetime
 import json
 import logging
+import re
 import time
 
 import docker.errors
-from docker.types.services import ServiceMode
+import yaml
+from docker.types import SecretReference, RestartPolicy
+from docker.types.services import ServiceMode, RestartConditionTypesEnum
 from nameko.events import EventDispatcher
 from nameko.rpc import rpc
 from nameko.web.handlers import http
+import re
 
 from common.base import BaseWorkerService
 from common.dependency import PoolProvider
@@ -100,6 +104,40 @@ def recompose_full_id(decomposed):
     return res
 
 
+def inc_name(name):
+    """
+    increment the name of the given file. detectect existing number in name before extension
+    :param name:
+    :return:
+    """
+    match = re.match(r"^(?P<n>.+?)(?P<num>\d+)?(?P<ext>\.(.*))?$", name)
+    if not match:
+        return name + '1'
+    groupdict = match.groupdict()
+
+    n = int(groupdict.get('num') or '0')
+    return "".join((
+        groupdict.get('n') or '',
+        "%s" % (n+1),
+        groupdict.get('ext') or ''
+    ))
+
+
+def escape_env_var(obj):
+    """create a copy of dict_ where all $ is doubled values of dict recursively"""
+    if isinstance(obj, str):
+        return obj.replace('$', '$$')
+    elif isinstance(obj, list):
+        return [escape_env_var(i) for i in obj]
+    elif isinstance(obj, dict):
+        return {
+            k: escape_env_var(v)
+            for k, v in obj.items()
+        }
+    else:
+        return obj
+
+
 class ScalerDocker(BaseWorkerService):
     """
     the docker swarm adapter
@@ -175,15 +213,17 @@ class ScalerDocker(BaseWorkerService):
     @once
     @log_all
     def start_listen_events(self):
-        logger.debug("start listening for docker events")
-        for event in self.docker.events(since=datetime.datetime.now(), decode=True):
-            if event['Action'] == 'update':
-                logger.debug("dispatching new update event: %s" % event['Actor']['Attributes'])
-                self.dispatch('service_updated', {
-                    'service': self.get(service_id=event['Actor']['ID']),
-                    'attributes': event['Actor']['Attributes'],
-                })
-
+        def listen_to_events():
+            logger.debug("start listening for docker events")
+            for event in self.docker.events(since=datetime.datetime.now(), decode=True):
+                if event['Action'] == 'update' and event['Type'] == 'service':
+                    logger.debug("event %s ", event)
+                    logger.debug("dispatching new update event: %s" % event['Actor']['Attributes'])
+                    self.dispatch('service_updated', {
+                        'service': self.get(service_id=event['Actor']['ID']),
+                        'attributes': event['Actor']['Attributes'],
+                    })
+        self.pool.spawn(listen_to_events)
     # ####################################################
     #  RPC endpoints
     # ####################################################
@@ -239,17 +279,202 @@ class ScalerDocker(BaseWorkerService):
 
     @rpc
     @log_all
+    def dump(self, stack=''):
+        """
+        dump the given stack based on current docker data.
+        this methed inspect docker to reproduce the same setup with docker stack deploy.
+
+        this create the folowing dict :
+        "filename" => "content",
+
+        it will generate a valid docker-compose file along with required files like config or secret.
+        currently don't support  (i'm lazy):
+        - endpoint_mode
+        - dns
+        - dns_search
+        - entrypoint
+        - deploy.placement.preferences
+        - expose
+        - extra_host
+        - external_link
+        - healthcheck
+        - init
+        - isolation
+        - logging
+
+
+
+        :return:
+        """
+        yaml_data = {
+            "version": "3.7",
+            "services": {},
+            "networks": {},
+            "configs": {},
+            "secrets": {},
+
+        }
+        files = {
+        }
+        namereplace = re.compile(r'^%s[_-]' % stack)
+
+        for service in self.docker.services.list():
+            try:
+                spec = service.attrs['Spec']
+                if spec.get('Labels', {}).get('com.docker.stack.namespace', '') != stack:
+                    continue
+                configs = []
+                for config in spec['TaskTemplate']['ContainerSpec'].get('Configs', []):
+                    config_name = filename = config['ConfigName']
+                    config_orig_name = namereplace.sub('', config['ConfigName'])
+                    while filename in files:
+                        filename = inc_name(filename)
+                    configs.append({
+                        "source": filename,
+                        "target": config['File']['Name'],
+                        "uid": config['File']['UID'],
+                        "gid": config['File']['GID'],
+                        "mode": config['File']['Mode'],
+                    })
+
+                    files[filename] = self.docker.configs.get(config_name).attrs['Spec']['Data']
+                    yaml_data['configs'][config_orig_name] = {'file': filename}
+                secrets = []
+                for secret in spec['TaskTemplate']['ContainerSpec'].get('Secrets', []):
+                    secret_name = filename = secret['SecretName']
+                    secret_orig_name = namereplace.sub('', secret['SecretName'])
+                    while filename in files:
+                        filename = inc_name(filename)
+                    secrets.append({
+                        "source": filename,
+                        "target": secret['File']['Name'],
+                        "uid": secret['File']['UID'],
+                        "gid": secret['File']['GID'],
+                        "mode": secret['File']['Mode'],
+                    })
+
+                    yaml_data['secrets'][secret_orig_name] = {
+                        'file': filename,
+                        'name': secret_orig_name
+                    }
+                    try:
+                        remanent = self.docker.services.list(filters=dict(name='maiev_get_secret'))
+                        if remanent:
+                            remanent[0].remove()
+                    except docker.errors.APIError:
+                        pass
+                    s = self.docker.services.create('bash', command=['cat', '/tmp/secret'],
+                                                    name='maiev_get_secret',
+                                                    restart_policy=RestartPolicy(RestartConditionTypesEnum.ON_FAILURE, 5, 1),
+                                                    secrets=[SecretReference(secret['SecretID'], secret_name, '/tmp/secret')])
+                    time.sleep(0.1)
+                    cnt = 0
+                    while len(s.tasks({'desired-state': 'running'})) > 0:
+                        time.sleep(0.5)
+                        cnt += 1
+                        if cnt > 60:
+                            raise Exception(
+                                "unable to retreive secret %s. task did not start: %s" % (
+                                    secret_name,
+                                    s.tasks({'desired-state': 'running'})
+                                )
+                            )
+
+                    files[filename] = b"".join(s.logs(stdout=True, follow=False)).decode('utf-8')
+                    s.remove()
+
+                networks = {}
+                for network_hash in spec['TaskTemplate'].get('Networks', []):
+                    net_obj = self.docker.networks.get(network_hash['Target'])
+                    network_name = namereplace.sub('', net_obj.attrs['Name'])
+                    yaml_data['networks'][network_name] = {
+                        "driver": net_obj.attrs['Driver'],
+                    }
+                    networks[network_name] = {}
+
+                if "Replicated" in spec['Mode']:
+                    mode = {
+                        "mode": "replicated",
+                        "replicas": spec['Mode']['Replicated']['Replicas']
+                    }
+                else:
+                    mode = {"mode": "global"}
+                s_yaml = {
+                    "image": spec['TaskTemplate']['ContainerSpec']['Image'],
+                    "environment": spec['TaskTemplate']['ContainerSpec'].get('Env',[]),
+                    "configs": configs,
+                    "secrets": secrets,
+                    "networks": networks,
+                    "volumes": [
+                        {
+                            "type": p['Type'],
+                            "source": p['Source'],
+                            "target": p['Target'],
+                        } for p in spec['TaskTemplate']['ContainerSpec'].get('Mounts', [])
+                    ],
+                    "ports": [
+                        {
+                            'target': p['TargetPort'],
+                            'published': p['PublishedPort'],
+                            'protocol': p['Protocol'],
+                            'mode': p['PublishMode'],
+                        } for p in spec['EndpointSpec'].get('Ports',[])
+                    ],
+                    "deploy": {
+                        "placement": {
+                            "constraints": spec['TaskTemplate']['Placement'].get('Constraints', []),
+                        },
+                        "resources": {
+                            "limits": spec['TaskTemplate']['Resources'].get('Limits', []),
+                            "reservations": spec['TaskTemplate']['Resources'].get('Reservations', []),
+                        },
+                        "restart_policy": {
+                            "condition": spec['TaskTemplate']['RestartPolicy']['Condition'],
+                            "delay": "%ss" % (
+                                    spec['TaskTemplate']['RestartPolicy'].get('Delay', 5000000000) / 1000000000
+                            ),  # from ns to s
+                            "max_attempts": spec['TaskTemplate']['RestartPolicy']['MaxAttempts'],
+                        } if spec['TaskTemplate'].get('RestartPolicy') else {},
+                        "rollback_config": {
+                           "parallelism": spec['RollbackConfig']["Parallelism"],
+                           "failure_action": spec['RollbackConfig']["FailureAction"],
+                           "monitor": spec['RollbackConfig']["Monitor"],
+                           "max_failure_ratio": spec['RollbackConfig']["MaxFailureRatio"],
+                           "order": spec['RollbackConfig']["Order"],
+                        } if spec['TaskTemplate'].get('RollbackConfig') else {},
+                        "update_config": {
+                           "parallelism": spec['UpdateConfig']["Parallelism"],
+                           "failure_action": spec['UpdateConfig']["FailureAction"],
+                           "monitor": spec['UpdateConfig']["Monitor"],
+                           "max_failure_ratio": spec['UpdateConfig']["MaxFailureRatio"],
+                           "order": spec['UpdateConfig']["Order"],
+                        } if spec['TaskTemplate'].get('UpdateConfig') else {},
+                        **mode
+                    }
+                }
+                args = spec['TaskTemplate']['ContainerSpec'].get('Args')
+                if args:
+                    s_yaml['command'] = args
+
+                service_name = namereplace.sub('', spec['Name'])
+                # double all $ in values to prevent env variable substitution of docker stack depoly
+                yaml_data['services'][service_name] = escape_env_var(s_yaml)
+            except Exception:
+                logger.exception("error with service payload %s" % service.attrs)
+                raise
+
+        files["docker-compose.yml"] = yaml.dump(yaml_data)
+        return files
+
+    @rpc
+    @log_all
     def fetch_image_config(self, image_full_id):
         if isinstance(image_full_id, dict):
             # we got all decomposed data.
             image_full_id = image_full_id.get('image_full_id', None) or recompose_full_id(image_full_id)
         try:
-            container = self.docker.containers.run(image_full_id, 'scale_info', remove=False, detach=True)
-            # tricks to make sure the container has flushed stdout and we got all data
-            container.logs(follow=True).decode('utf-8')
-            container.stop()
-            result = container.logs(follow=True).decode('utf-8')
-            container.remove()
+            cmd = 'scale_info'
+            result = self.docker_run(cmd, image_full_id)
         except (docker.errors.NotFound, docker.errors.ContainerError) as e:
             if "executable file not found in " not in str(e):
                 logger.debug("extra error for scaler_info", exc_info=True)
@@ -260,6 +485,27 @@ class ScalerDocker(BaseWorkerService):
             except json.JSONDecodeError:
                 logger.exception("docker image %s has invalide scale_info output: %r", image_full_id, result)
                 return None
+
+    def docker_run(self, cmd, image_full_id, **kwargs):
+        """
+        execute cmd into image and return the stdout
+        :param cmd:
+        :param image_full_id:
+        :return:
+        """
+        result = None
+        try:
+            container = self.docker.containers.run(image_full_id, cmd, remove=False, detach=True, **kwargs)
+            # tricks to make sure the container has flushed stdout and we got all data
+            container.logs(follow=True).decode('utf-8')
+            container.stop()
+            result = container.logs(follow=True).decode('utf-8')
+        finally:
+            try:
+                container.remove()
+            except Exception:
+                pass
+        return result
 
     @rpc
     @log_all
