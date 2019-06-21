@@ -7,12 +7,11 @@ import time
 
 import docker.errors
 import yaml
-from docker.types import SecretReference, RestartPolicy
-from docker.types.services import ServiceMode, RestartConditionTypesEnum
+from docker.types import RestartPolicy, SecretReference
+from docker.types.services import RestartConditionTypesEnum, ServiceMode
 from nameko.events import EventDispatcher
 from nameko.rpc import rpc
 from nameko.web.handlers import http
-import re
 
 from common.base import BaseWorkerService
 from common.dependency import PoolProvider
