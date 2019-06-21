@@ -3,7 +3,7 @@ WEB_SERVER_ADDRESS: '0.0.0.0:8000'
 MONGO_URIS: ${MONGO_URIS:maiev_mongodb}
 MONITORED_SERVER_URL: ${MONITORED_SERVER_URL}
 
-serializer: json_datecompatible
+serializer: nameko-serializer
 max_workers: ${NAMEKO_MAX_WORKERS:10}
 
 

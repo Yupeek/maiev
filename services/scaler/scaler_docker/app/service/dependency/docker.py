@@ -32,4 +32,3 @@ class DockerClientProvider(DependencyProvider):
             return res
         self.client.events = events
         return self.client
-

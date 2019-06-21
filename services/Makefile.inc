@@ -51,6 +51,8 @@ build-image:  ## build this image docker 2
 		.
 	@echo built $(TMP_IMAGE_NAME)
 
+tag:
+	$(DOCKER) tag $(TMP_IMAGE_NAME)  $(DOCKER_REPO)/$(FULL_IMAGE_ID);
 
 # === DEPLOY DOCKER IMAGE
 

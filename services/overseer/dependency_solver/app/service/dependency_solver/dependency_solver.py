@@ -8,6 +8,7 @@ from booleano.exc import ScopeError
 from booleano.operations.variables import BooleanVariable, variable_symbol_table_builder
 from booleano.parser import Bind, Grammar, SymbolTable
 from booleano.parser.core import EvaluableParseManager
+from eventlet import greenthread
 from nameko.rpc import rpc
 
 from common.base import BaseWorkerService
@@ -286,6 +287,8 @@ class Solver(object):
     def backtrack(self, remaining_services, constraints, tmp_solution):
         if len(remaining_services) == 0:
             yield tmp_solution
+        greenthread.sleep(0)
+        logger.debug("backtracking %s => %s" % (len(remaining_services), len(tmp_solution)))
         for i, (remaining_service, versions) in enumerate(remaining_services):
 
             for version_num, version in sorted(versions.items(), reverse=True):

@@ -118,7 +118,7 @@ def inc_name(name):
     n = int(groupdict.get('num') or '0')
     return "".join((
         groupdict.get('n') or '',
-        "%s" % (n+1),
+        "%s" % (n + 1),
         groupdict.get('ext') or ''
     ))
 
@@ -323,74 +323,10 @@ class ScalerDocker(BaseWorkerService):
                 spec = service.attrs['Spec']
                 if spec.get('Labels', {}).get('com.docker.stack.namespace', '') != stack:
                     continue
-                configs = []
-                for config in spec['TaskTemplate']['ContainerSpec'].get('Configs', []):
-                    config_name = filename = config['ConfigName']
-                    config_orig_name = namereplace.sub('', config['ConfigName'])
-                    while filename in files:
-                        filename = inc_name(filename)
-                    configs.append({
-                        "source": filename,
-                        "target": config['File']['Name'],
-                        "uid": config['File']['UID'],
-                        "gid": config['File']['GID'],
-                        "mode": config['File']['Mode'],
-                    })
+                configs = self._dump_configs(files, namereplace, spec, yaml_data)
+                secrets = self._dump_services(files, namereplace, spec, yaml_data)
 
-                    files[filename] = self.docker.configs.get(config_name).attrs['Spec']['Data']
-                    yaml_data['configs'][config_orig_name] = {'file': filename}
-                secrets = []
-                for secret in spec['TaskTemplate']['ContainerSpec'].get('Secrets', []):
-                    secret_name = filename = secret['SecretName']
-                    secret_orig_name = namereplace.sub('', secret['SecretName'])
-                    while filename in files:
-                        filename = inc_name(filename)
-                    secrets.append({
-                        "source": filename,
-                        "target": secret['File']['Name'],
-                        "uid": secret['File']['UID'],
-                        "gid": secret['File']['GID'],
-                        "mode": secret['File']['Mode'],
-                    })
-
-                    yaml_data['secrets'][secret_orig_name] = {
-                        'file': filename,
-                        'name': secret_orig_name
-                    }
-                    try:
-                        remanent = self.docker.services.list(filters=dict(name='maiev_get_secret'))
-                        if remanent:
-                            remanent[0].remove()
-                    except docker.errors.APIError:
-                        pass
-                    s = self.docker.services.create('bash', command=['cat', '/tmp/secret'],
-                                                    name='maiev_get_secret',
-                                                    restart_policy=RestartPolicy(RestartConditionTypesEnum.ON_FAILURE, 5, 1),
-                                                    secrets=[SecretReference(secret['SecretID'], secret_name, '/tmp/secret')])
-                    time.sleep(0.1)
-                    cnt = 0
-                    while len(s.tasks({'desired-state': 'running'})) > 0:
-                        time.sleep(0.5)
-                        cnt += 1
-                        if cnt > 60:
-                            raise Exception(
-                                "unable to retreive secret %s. task did not start: %s" % (
-                                    secret_name,
-                                    s.tasks({'desired-state': 'running'})
-                                )
-                            )
-
-                    files[filename] = b"".join(s.logs(stdout=True, follow=False)).decode('utf-8')
-                    s.remove()
-
-                networks = {}
-                for network_hash in spec['TaskTemplate'].get('Networks', []):
-                    net_obj = self.docker.networks.get(network_hash['Target'])
-                    network_name = namereplace.sub('', net_obj.attrs['Name'])
-                    yaml_data['networks'][network_name] = {
-                        "driver": net_obj.attrs['Driver'],
-                    }
-                    networks[network_name] = {}
+                networks = self._dump_networks(namereplace, spec, yaml_data)
 
                 if "Replicated" in spec['Mode']:
                     mode = {
@@ -401,7 +337,7 @@ class ScalerDocker(BaseWorkerService):
                     mode = {"mode": "global"}
                 s_yaml = {
                     "image": spec['TaskTemplate']['ContainerSpec']['Image'],
-                    "environment": spec['TaskTemplate']['ContainerSpec'].get('Env',[]),
+                    "environment": spec['TaskTemplate']['ContainerSpec'].get('Env', []),
                     "configs": configs,
                     "secrets": secrets,
                     "networks": networks,
@@ -418,7 +354,7 @@ class ScalerDocker(BaseWorkerService):
                             'published': p['PublishedPort'],
                             'protocol': p['Protocol'],
                             'mode': p['PublishMode'],
-                        } for p in spec['EndpointSpec'].get('Ports',[])
+                        } for p in spec['EndpointSpec'].get('Ports', [])
                     ],
                     "deploy": {
                         "placement": {
@@ -431,23 +367,23 @@ class ScalerDocker(BaseWorkerService):
                         "restart_policy": {
                             "condition": spec['TaskTemplate']['RestartPolicy']['Condition'],
                             "delay": "%ss" % (
-                                    spec['TaskTemplate']['RestartPolicy'].get('Delay', 5000000000) / 1000000000
+                                spec['TaskTemplate']['RestartPolicy'].get('Delay', 5000000000) / 1000000000
                             ),  # from ns to s
                             "max_attempts": spec['TaskTemplate']['RestartPolicy']['MaxAttempts'],
                         } if spec['TaskTemplate'].get('RestartPolicy') else {},
                         "rollback_config": {
-                           "parallelism": spec['RollbackConfig']["Parallelism"],
-                           "failure_action": spec['RollbackConfig']["FailureAction"],
-                           "monitor": spec['RollbackConfig']["Monitor"],
-                           "max_failure_ratio": spec['RollbackConfig']["MaxFailureRatio"],
-                           "order": spec['RollbackConfig']["Order"],
+                            "parallelism": spec['RollbackConfig']["Parallelism"],
+                            "failure_action": spec['RollbackConfig']["FailureAction"],
+                            "monitor": spec['RollbackConfig']["Monitor"],
+                            "max_failure_ratio": spec['RollbackConfig']["MaxFailureRatio"],
+                            "order": spec['RollbackConfig']["Order"],
                         } if spec['TaskTemplate'].get('RollbackConfig') else {},
                         "update_config": {
-                           "parallelism": spec['UpdateConfig']["Parallelism"],
-                           "failure_action": spec['UpdateConfig']["FailureAction"],
-                           "monitor": spec['UpdateConfig']["Monitor"],
-                           "max_failure_ratio": spec['UpdateConfig']["MaxFailureRatio"],
-                           "order": spec['UpdateConfig']["Order"],
+                            "parallelism": spec['UpdateConfig']["Parallelism"],
+                            "failure_action": spec['UpdateConfig']["FailureAction"],
+                            "monitor": spec['UpdateConfig']["Monitor"],
+                            "max_failure_ratio": spec['UpdateConfig']["MaxFailureRatio"],
+                            "order": spec['UpdateConfig']["Order"],
                         } if spec['TaskTemplate'].get('UpdateConfig') else {},
                         **mode
                     }
@@ -465,6 +401,84 @@ class ScalerDocker(BaseWorkerService):
 
         files["docker-compose.yml"] = yaml.dump(yaml_data)
         return files
+
+    def _dump_networks(self, namereplace, spec, yaml_data):
+        networks = {}
+        for network_hash in spec['TaskTemplate'].get('Networks', []):
+            net_obj = self.docker.networks.get(network_hash['Target'])
+            network_name = namereplace.sub('', net_obj.attrs['Name'])
+            yaml_data['networks'][network_name] = {
+                "driver": net_obj.attrs['Driver'],
+            }
+            networks[network_name] = {}
+        return networks
+
+    def _dump_configs(self, files, namereplace, spec, yaml_data):
+        configs = []
+        for config in spec['TaskTemplate']['ContainerSpec'].get('Configs', []):
+            config_name = filename = config['ConfigName']
+            config_orig_name = namereplace.sub('', config['ConfigName'])
+            while filename in files:
+                filename = inc_name(filename)
+            configs.append({
+                "source": filename,
+                "target": config['File']['Name'],
+                "uid": config['File']['UID'],
+                "gid": config['File']['GID'],
+                "mode": config['File']['Mode'],
+            })
+
+            files[filename] = self.docker.configs.get(config_name).attrs['Spec']['Data']
+            yaml_data['configs'][config_orig_name] = {'file': filename}
+        return configs
+
+    def _dump_services(self, files, namereplace, spec, yaml_data):
+        secrets = []
+        for secret in spec['TaskTemplate']['ContainerSpec'].get('Secrets', []):
+            secret_name = filename = secret['SecretName']
+            secret_orig_name = namereplace.sub('', secret['SecretName'])
+            while filename in files:
+                filename = inc_name(filename)
+            secrets.append({
+                "source": filename,
+                "target": secret['File']['Name'],
+                "uid": secret['File']['UID'],
+                "gid": secret['File']['GID'],
+                "mode": secret['File']['Mode'],
+            })
+
+            yaml_data['secrets'][secret_orig_name] = {
+                'file': filename,
+                'name': secret_orig_name
+            }
+            try:
+                remanent = self.docker.services.list(filters=dict(name='maiev_get_secret'))
+                if remanent:
+                    remanent[0].remove()
+            except docker.errors.APIError:
+                pass
+            s = self.docker.services.create(
+                'bash', command=['cat', '/tmp/secret'],
+                name='maiev_get_secret',
+                restart_policy=RestartPolicy(RestartConditionTypesEnum.ON_FAILURE, 5, 1),
+                secrets=[SecretReference(secret['SecretID'], secret_name, '/tmp/secret')]
+            )
+            time.sleep(0.1)
+            cnt = 0
+            while len(s.tasks({'desired-state': 'running'})) > 0:
+                time.sleep(0.5)
+                cnt += 1
+                if cnt > 60:
+                    raise Exception(
+                        "unable to retreive secret %s. task did not start: %s" % (
+                            secret_name,
+                            s.tasks({'desired-state': 'running'})
+                        )
+                    )
+
+            files[filename] = b"".join(s.logs(stdout=True, follow=False)).decode('utf-8')
+            s.remove()
+        return secrets
 
     @rpc
     @log_all

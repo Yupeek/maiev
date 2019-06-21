@@ -87,3 +87,67 @@ with a docker swarm setup, you can do this:
 
 this will start maiev. it will query all existings services to start monitoring each one which has the
 command «scaler_info».
+
+
+utils
+=====
+
+maiev-shell
+-----------
+
+maiev-shell is a docker image which has all usefull stuff to start a shell to interact with nameko service (maiev).
+you just must provide the rabbitmq url (ie: ``amqp://guest:guest@myrabbitmq/``)
+
+it provide:
+
+- a nameko shell with ipython, connected to the given cluster (most probably maiev)
+- completion of nameko running services: type n.rpc.<TAB> to see them
+- completion of service methode, along with arguments,  if the service inherit from BaseWorkerService implemented in
+  services/maiev-base/app/common/base.py
+
+
+
+usage::
+
+	docker run -it --rm yupeek/maiev:shell $RABBITMQ_URL
+
+to keep track of your history::
+
+	mkdir -p $HOME/.ipython/profile_default/ && touch $HOME/.ipython/profile_default/history.sqlite
+	docker run -it --rm -v $HOME/.ipython/profile_default/history.sqlite:/root/.ipython/profile_default/history.sqlite yupeek/maiev:shell $RABBITMQ_URL
+
+
+if you don't want to input your rabbitmq, it can be guessed by env variables on a running maiev docker container.
+the following snipet create a function which just take the name of the docker container, and will run a shell on his
+rabbitmq (require jq and docker binary)::
+
+	# alias function. take as argument either : a docker service name, a container name, or the url to rabbitmq
+	maiev-shell () {
+		arg1=$1
+		which jq &> /dev/null || (echo "you must install jq to run this function" && return 1)
+		which docker &> /dev/null || (echo "you must install docker to run this function" && return 1)
+		mkdir -p $HOME/.ipython/profile_default/ && touch $HOME/.ipython/profile_default/history.sqlite
+
+	  jqexpr=' map(split("=") | {key: .[0], value: .[1]}) | from_entries | "amqp://" + .RABBITMQ_USER + ":" + .RABBITMQ_PASSWORD + "@" + .RABBITMQ_HOST + .RABBITMQ_VHOST'
+
+	  if rawdata=$(docker service inspect $arg1 2> /dev/null);
+	  then
+	    jqpath=".[].Spec.TaskTemplate.ContainerSpec.Env | $jqexpr"
+	  else
+	    if rawdata=$(docker inspect $arg1 2> /dev/null);
+	    then
+	      jqpath=".[].Config.Env | $jqexpr"
+	    else
+	      rawdata="\"$arg1\""
+	      jqpath='.'
+	    fi
+	  fi
+
+		url=$(echo $rawdata | jq $jqpath -r)
+
+	  docker run -it --rm -v $HOME/.ipython/profile_default/history.sqlite:/root/.ipython/profile_default/history.sqlite yupeek/maiev:shell $url
+	}
+
+	# completion function if zsh
+	which compdef &> /dev/null && _maiev-shell () { __docker_complete_containers_names $1; __docker_complete_services_names $1;} && compdef _maiev-shell maiev-shell
+

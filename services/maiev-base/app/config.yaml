@@ -2,7 +2,7 @@ AMQP_URI: amqp://${RABBITMQ_USER:guest}:${RABBITMQ_PASSWORD:guest}@${RABBITMQ_HO
 WEB_SERVER_ADDRESS: '0.0.0.0:8000'
 MONGO_URIS: ${MONGO_URIS:maiev_mongodb}
 
-serializer: json_datecompatible
+serializer: nameko-serializer
 max_workers: ${NAMEKO_MAX_WORKERS:10}
 
 LOGGING:

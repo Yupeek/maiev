@@ -1,9 +1,9 @@
 
 booleano==1.1a1
 eventlet==0.21.0
-./services/maiev-base/app/extra_package/datecompatible_json_serializer/
+nameko-serializer>=1.0.0,<1.99
 ipython
-nameko==2.8.5
+nameko==2.12.0
 promise==2.0b1
 pymongo
 pytest
