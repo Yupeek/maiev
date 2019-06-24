@@ -543,9 +543,9 @@ class UpgradePlaner(BaseWorkerService):
         elif next_step is None:
             # the last service was the current one.
             # this upgrade is done
-            logger.info("scheduling is finished %s", running_scheduled)
             updated_step['state'] = DONE
             running_scheduled['state'] = DONE
+            logger.info("scheduling is finished %s", running_scheduled)
         else:
             # we are still in a upgrade plan
             updated_step['state'] = DONE
