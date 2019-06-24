@@ -93,7 +93,8 @@
       "trigger:event:ruleset_triggered:params": [
         "ruleset",
         "rules_stats"
-      ]
+      ],
+      "scaler_docker:rpc:dump": 1
     },
     "require": [
       "dependency_solver:rpc:explain > 0",

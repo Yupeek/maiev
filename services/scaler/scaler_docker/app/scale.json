@@ -12,8 +12,8 @@
       "scaler_docker:rpc:update": 1,
       "scaler_docker:rpc:get": 1,
       "scaler_docker:rpc:list_services": 1,
-      "scaler_docker:rpc:fetch_image_config": 1
+      "scaler_docker:rpc:fetch_image_config": 1,
+      "scaler_docker:rpc:dump": 1
     }
-
   }
 }

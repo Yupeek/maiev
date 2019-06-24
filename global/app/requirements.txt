@@ -1,13 +1,22 @@
 
 booleano==1.1a1
+docker
+docker-registry-client==0.5.2
 eventlet==0.21.0
+flake8==3.3.0
 ipython
-nameko==2.8.5
+isort
+nameko==2.12.0
+nameko-serializer>=1.0.0,<1.99
+pep8
 promise==2.0b1
 pymongo
 pytest
+pytest-cov
+python_logstash_async==1.1.0
 pytz
+regex
 requests
 semantic_version==2.6.0
+tzlocal
 watchdog
-docker
