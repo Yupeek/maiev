@@ -178,6 +178,10 @@ class Solver(object):
             )
         encountered_solutions = [
         ]
+        nb_possibilities = 1
+        for _, versions in variables:
+            nb_possibilities *= len(versions)
+        logger.debug("solving %s possibilities using variables %r" % (nb_possibilities, variables))
         for solution in self.backtrack(variables, [self.check_requirements, self.check_extra_constraints], []):
             pined = {
                 pin[0]['name']: pin[1]
@@ -288,7 +292,6 @@ class Solver(object):
         if len(remaining_services) == 0:
             yield tmp_solution
         greenthread.sleep(0)
-        logger.debug("backtracking %s => %s" % (len(remaining_services), len(tmp_solution)))
         for i, (remaining_service, versions) in enumerate(remaining_services):
 
             for version_num, version in sorted(versions.items(), reverse=True):

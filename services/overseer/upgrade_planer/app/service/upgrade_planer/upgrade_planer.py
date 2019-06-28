@@ -317,10 +317,10 @@ class UpgradePlaner(BaseWorkerService):
         completed_ = payload['diff'].get('state', {}).get('to') == 'completed'
         replicas_ = payload['service']['mode'] == {'name': 'replicated', 'replicas': 0}
         if completed_ or replicas_:
-            logger.debug("continue plans: <completed_=%s replicas_=%s>")
+            logger.debug("continue plans: <completed_=%s replicas_=%s>", completed_, replicas_)
             self.continue_scheduled_plan(service, from_version, version_)
         else:
-            logger.debug("notification inused: <completed_=%s replicas_=%s>")
+            logger.debug("notification inused: <completed_=%s replicas_=%s>", completed_, replicas_)
 
     @event_handler(
         "overseer", "cleaned_image", handler_type=SERVICE_POOL, reliable_delivery=True
