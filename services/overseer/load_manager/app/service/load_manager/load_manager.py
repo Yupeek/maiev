@@ -138,6 +138,16 @@ class LoadManager(BaseWorkerService):
         self.mongo.services.delete_many({'name': service_name})
         self.trigger.delete(self.name, service_name)
 
+    @rpc
+    @log_all
+    def list_services(self):
+        return self._get_services()
+
+    @rpc
+    @log_all
+    def get_service(self, name):
+        return self._get_service(name)
+
     # #######################################
     # private database helpers
     # #######################################
