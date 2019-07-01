@@ -9,7 +9,7 @@ from nameko.timer import timer
 
 from common.base import BaseWorkerService
 from common.db.mongo import Mongo
-from common.utils import log_all, filter_dict
+from common.utils import filter_dict, log_all
 
 logger = logging.getLogger(__name__)
 
