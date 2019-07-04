@@ -316,7 +316,9 @@ class UpgradePlaner(BaseWorkerService):
         # we just handle finished changes: complited event or update of 0 replicas service
         completed_ = payload['diff'].get('state', {}).get('to') == 'completed'
         replicas_ = payload['service']['mode'] == {'name': 'replicated', 'replicas': 0}
-        if completed_ or replicas_:
+        if from_version == version_:
+            logger.debug("stayed at version %s: this is not an upgrade", from_version)
+        elif completed_ or replicas_:
             logger.debug("continue plans: <completed_=%s replicas_=%s>", completed_, replicas_)
             self.continue_scheduled_plan(service, from_version, version_)
         else:
@@ -512,7 +514,6 @@ class UpgradePlaner(BaseWorkerService):
         :param str to_version:
         :return:
         """
-
         running_scheduled = self.mongo.scheduling.find_one({"state": RUNNING})
         if running_scheduled is None:
             # nothing to do since it was not a part of a running upgrade plan
