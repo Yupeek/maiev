@@ -210,7 +210,6 @@ class Trigger(BaseWorkerService):
         for ruleset in self.mongo.rulesets.find(q):
             for resource in ruleset['resources']:
                 if resource['monitorer'] == payload['monitorer'] and resource['identifier'] == payload['identifier']:
-                    logger.debug("save metrics for resource %s: %s", resource['identifier'], payload['metrics'])
                     self._save_metrics(ruleset, resource, payload['metrics'])
             try:
                 results = self._compute_ruleset(ruleset)

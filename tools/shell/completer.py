@@ -63,7 +63,6 @@ def complete_args(self, method):
 completer._default_arguments.register(MethodProxy)(types.MethodType(complete_args, completer))
 
 
-print("completing %s with %s" % (ClusterProxy, id(ClusterProxy)))
 @complete_object.register(ClusterProxy)
 def complete_services(cluster, prev_compl):
     if services_list:
@@ -77,7 +76,6 @@ def complete_services(cluster, prev_compl):
             netloc += ":15672"
 
         url = urllib.parse.urlunparse(('http', netloc, 'api',) + ('',) * 3)
-        print("completing using url %s" % url)
 
         queues = [q['name'] for q in requests.get(url + '/queues').json()]
         services_list.extend([
