@@ -38,13 +38,13 @@ RuleSet = {
     "name": str,  # the name of the ruleset
     "resources": List[ # the list of resources that is used for this parsing (set of metrics)
         {
-            "name": str,  # the name of the ressource (given by the service,
+            "name": str,  # the name of the resource (given by the service,
                           # used for expression reference ie: «mq:latency»)
-            "monitorer": str,  # name of the monitorer that provide this ressource (monitorer_rabbitmq)
+            "monitorer": str,  # name of the monitorer that provide this resource (monitorer_rabbitmq)
             "identifier": str,  # the identifier used by the monitorer. can be meaningless to us
             "history": {
                 "last_metrics": Dict[str, Any],  # the last metrics for thir resources
-                "date": datetime.datetime,  # the last date of this ressource
+                "date": datetime.datetime,  # the last date of this resource
             }
         }
     ],
@@ -67,7 +67,7 @@ MetricsPayload = {
         "waiting": int,  # the number of waiting work
         "latency": float,  # the current latency
         "rate": float,  # the real rate (>0 mean taking retard, <0 mean emptying queue)
-        "call_rate": float,  # the rate at which the ressource is used
+        "call_rate": float,  # the rate at which the resource is used
         "exec_rate": float,  # the rate at which the worker empty the queue
         "consumers": int,  # the number of consumer for this work
     }
@@ -307,7 +307,7 @@ class Trigger(BaseWorkerService):
             ruleset,
             upsert=True,
         )
-        # ask for monitorer to provide queue ressources datas
+        # ask for monitorer to provide queue resources datas
         for resource in ruleset['resources']:
             self.monitorer_rpc.get(resource['monitorer']).track(resource['identifier'])
 
@@ -347,27 +347,27 @@ class Trigger(BaseWorkerService):
     #                 PRIVATE
     # ####################################################
 
-    def _save_metrics(self, ruleset, ressource, metrics):
+    def _save_metrics(self, ruleset, resource, metrics):
         """
         save the metric in the history of resource in ruleset
         :param ruleset: the ruleset to save in mongodb (update)
-        :param ressource: the resource to modify by side effect
+        :param resource: the resource to modify by side effect
         :param metrics: the metric to save into the bases.
         :return:
         """
-        if ressource.get('history', {}).get('last_metrics') == metrics:
+        if resource.get('history', {}).get('last_metrics') == metrics:
             return False
-        ressource['history'] = {
+        resource['history'] = {
             'last_metrics': metrics,
             'date': get_now()
         }
         self.mongo.rulesets.update_one(
             {
                 '_id': ruleset['_id'],
-                'ressource.name': ressource['name']
+                'resources.name': resource['name']
             }, {
                 "$set": {
-                    "ressource.$.history": ressource['history']
+                    "resources.$.history": resource['history']
                 }
             }
         )
@@ -409,12 +409,12 @@ class Trigger(BaseWorkerService):
             "name": ruleset['name'],
             "resources": [
                 {
-                    "name": ressource['name'],
-                    "monitorer": ressource['monitorer'],
-                    "identifier": ressource['identifier'],
-                    "history": {k: v for k, v in ressource.get('history', {}).items() if k in ("last_metrics", "date")}
+                    "name": resource['name'],
+                    "monitorer": resource['monitorer'],
+                    "identifier": resource['identifier'],
+                    "history": {k: v for k, v in resource.get('history', {}).items() if k in ("last_metrics", "date")}
                 }
-                for ressource in (ruleset.get("resources") or ())
+                for resource in (ruleset.get("resources") or ())
             ],
             "rules": [
                 {
@@ -440,11 +440,11 @@ class Trigger(BaseWorkerService):
         """
         # build all asked resources for this ruleset
         metrics = {}
-        for ressource in ruleset["resources"]:
-            val = ressource.get('history', {}).get('last_metrics')
+        for resource in ruleset["resources"]:
+            val = resource.get('history', {}).get('last_metrics')
             if not val:
                 return
-            metrics[ressource['name']] = val
+            metrics[resource['name']] = val
 
         return self._solve_rules(
             ruleset['rules'],

@@ -1,2 +1,2 @@
-serializer: json_datecompatible
+serializer: nameko-serializer
 AMQP_URI: ${AMQP_URI:amqp://guest:guest@localhost/}

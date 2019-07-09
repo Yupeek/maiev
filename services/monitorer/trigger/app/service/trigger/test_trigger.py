@@ -596,3 +596,130 @@ class TestEventComputing(WithDbTestTrigger):
                     'rules_stats': {'panic': True, 'latency_fail': True, 'stable_latency': False, 'latency_ok': False},
                 })
                 compute_ruleset.assert_called_once()
+
+
+class TestSpecificSetup(WithDbTestTrigger):
+
+    def test_store_history_one(self):
+        self.rulesets.insert_one({
+            "owner": "overseer_load_manager",
+            "name": "gmd_joboffer_xml_publisher",
+            "resources": [
+                {
+                    "name": "rmq",
+                    "monitorer": "monitorer_rabbitmq",
+                    "identifier": "rpc-ECMC_joboffer_xml_publisher",
+                    "history": {}
+                }
+            ],
+            "rules": [
+                {
+                    "name": "__scale_down__",
+                    "expression": "rules:stable_latency and rmq:consumers > 0",
+                    "history": None
+                }
+            ]
+        })
+
+        assert self.rulesets.find_one()["resources"][0]['history'] == {}
+        self.service.on_metrics_updated({
+            "monitorer": "monitorer_rabbitmq", "identifier": "rpc-ECMC_joboffer_xml_publisher",
+            "metrics":
+                {"exists": True, "waiting": 0, "latency": None, "rate": None,
+                 "call_rate": 0, "exec_rate": 0, "consumers": 3
+                 }})
+
+        history = self.rulesets.find_one()["resources"][0]['history']
+        assert history != {}
+        assert history['last_metrics'] == {
+            'exists': True, 'waiting': 0, 'latency': None, 'rate': None,
+            'call_rate': 0, 'exec_rate': 0, 'consumers': 3
+        }
+
+    def test_store_history_multi_same_history(self):
+        self.rulesets.insert_one({
+            "owner": "overseer_load_manager",
+            "name": "gmd_joboffer_xml_publisher",
+            "resources": [
+                {
+                    "name": "rmq",
+                    "monitorer": "monitorer_rabbitmq",
+                    "identifier": "rpc-ECMC_joboffer_xml_publisher",
+                    "history": {}
+                },
+                {
+                    "name": "rmq2",
+                    "monitorer": "monitorer_rabbitmq",
+                    "identifier": "rpc-ECMC_joboffer_xml_publisher",
+                    "history": {}
+                }
+            ],
+            "rules": [
+                {
+                    "name": "__scale_down__",
+                    "expression": "rules:stable_latency and rmq:consumers > 0",
+                    "history": None
+                }
+            ]
+        })
+
+        assert self.rulesets.find_one()["resources"][0]['history'] == {}
+        assert self.rulesets.find_one()["resources"][1]['history'] == {}
+        self.service.on_metrics_updated(
+            {"monitorer": "monitorer_rabbitmq", "identifier": "rpc-ECMC_joboffer_xml_publisher",
+             "metrics": {"exists": True, "waiting": 0, "latency": None, "rate": None, "call_rate": 0, "exec_rate": 0,
+                         "consumers": 3}})
+        history = self.rulesets.find_one()["resources"][0]['history']
+        history2 = self.rulesets.find_one()["resources"][1]['history']
+        assert history != {}
+        assert history['last_metrics'] == {
+            'exists': True, 'waiting': 0, 'latency': None, 'rate': None,
+            'call_rate': 0, 'exec_rate': 0, 'consumers': 3
+        }
+        assert history2 != {}
+        assert history2['last_metrics'] == {
+            'exists': True, 'waiting': 0, 'latency': None, 'rate': None,
+            'call_rate': 0, 'exec_rate': 0, 'consumers': 3
+        }
+
+    def test_store_history_multi_different_resources(self):
+        self.rulesets.insert_one({
+            "owner": "overseer_load_manager",
+            "name": "gmd_joboffer_xml_publisher",
+            "resources": [
+                {
+                    "name": "rmq",
+                    "monitorer": "monitorer_rabbitmq",
+                    "identifier": "rpc-ECMC_joboffer_xml_publisher",
+                    "history": {}
+                },
+                {
+                    "name": "rmq2",
+                    "monitorer": "monitorer_rabbitmq",
+                    "identifier": "rpc-ECMC_joboffer_algolia_publisher",
+                    "history": {}
+                }
+            ],
+            "rules": [
+                {
+                    "name": "__scale_down__",
+                    "expression": "rules:stable_latency and rmq:consumers > 0",
+                    "history": None
+                }
+            ]
+        })
+
+        assert self.rulesets.find_one()["resources"][0]['history'] == {}
+        assert self.rulesets.find_one()["resources"][1]['history'] == {}
+        self.service.on_metrics_updated(
+            {"monitorer": "monitorer_rabbitmq", "identifier": "rpc-ECMC_joboffer_xml_publisher",
+             "metrics": {"exists": True, "waiting": 0, "latency": None, "rate": None, "call_rate": 0, "exec_rate": 0,
+                         "consumers": 3}})
+        history = self.rulesets.find_one()["resources"][0]['history']
+        history2 = self.rulesets.find_one()["resources"][1]['history']
+        assert history != {}
+        assert history['last_metrics'] == {
+            'exists': True, 'waiting': 0, 'latency': None, 'rate': None,
+            'call_rate': 0, 'exec_rate': 0, 'consumers': 3
+        }
+        assert history2 == {}

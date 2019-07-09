@@ -259,6 +259,9 @@ class Overseer(BaseWorkerService):
         service_data = payload['service']
         attributes = payload.get('attributes', {})
         service = self._get_service(service_data['name'])
+        if service is None:
+            logger.warning("detected service «%s» updated which is not monitored : %s", service_data['name'], payload)
+            return
         diff = self._compute_diff(service_data, service, attributes)
         scaler = self._get_scaler(service)
         self._save_service_state(service_data, scaler, service)

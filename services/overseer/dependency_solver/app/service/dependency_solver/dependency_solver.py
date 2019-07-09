@@ -8,6 +8,7 @@ from booleano.exc import ScopeError
 from booleano.operations.variables import BooleanVariable, variable_symbol_table_builder
 from booleano.parser import Bind, Grammar, SymbolTable
 from booleano.parser.core import EvaluableParseManager
+from eventlet import greenthread
 from nameko.rpc import rpc
 
 from common.base import BaseWorkerService
@@ -177,6 +178,10 @@ class Solver(object):
             )
         encountered_solutions = [
         ]
+        nb_possibilities = 1
+        for _, versions in variables:
+            nb_possibilities *= len(versions)
+        logger.debug("solving %s possibilities using variables %r" % (nb_possibilities, variables))
         for solution in self.backtrack(variables, [self.check_requirements, self.check_extra_constraints], []):
             pined = {
                 pin[0]['name']: pin[1]
@@ -286,6 +291,7 @@ class Solver(object):
     def backtrack(self, remaining_services, constraints, tmp_solution):
         if len(remaining_services) == 0:
             yield tmp_solution
+        greenthread.sleep(0)
         for i, (remaining_service, versions) in enumerate(remaining_services):
 
             for version_num, version in sorted(versions.items(), reverse=True):

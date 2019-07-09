@@ -9,7 +9,7 @@ from nameko.timer import timer
 
 from common.base import BaseWorkerService
 from common.db.mongo import Mongo
-from common.utils import log_all
+from common.utils import filter_dict, log_all
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +72,7 @@ class LoadManager(BaseWorkerService):
         if ruleset.get('owner') == self.name and ruleset.get('name'):
             service = self._get_service(ruleset['name'])
             ruleset = payload['rules_stats']
+            logger.debug("ruleset triggered by event for service %s: %s", service['name'], ruleset)
             self._execute_ruleset(ruleset, service)
 
     @event_handler(
@@ -83,11 +84,13 @@ class LoadManager(BaseWorkerService):
         diff = payload.get('diff')
         my_service = self._get_service(service['name'])
         if my_service is None:
+            logger.debug("detected unmonitored service update")
             return  # this service is not monitored by us
 
         if 'scale' in diff or 'mode' in diff:
             my_service['mode'] = service['mode']
         if 'scale_config' in diff and 'scale' in service['scale_config']:
+            logger.debug("detected new scale config for service %s", service['name'])
             my_service['scale_config'] = service['scale_config']
             self._set_trigger_rules(service['name'], service['scale_config']['scale'])
 
@@ -108,8 +111,9 @@ class LoadManager(BaseWorkerService):
                 rule, date = latest_ruleset['rule'], latest_ruleset['date']
             except KeyError:
                 continue
-            if (rule['__scale_up__'] or rule['__scale_down__']) and \
-                    (now - date).total_seconds() > 30:
+            seconds = (now - date).total_seconds()
+            if (rule['__scale_up__'] or rule['__scale_down__']) and seconds > 30:
+                logger.debug("reexecuting ruleset because fixed since %s sec: rulset=%s", seconds, rule)
                 self._execute_ruleset(rule, service)
 
     @rpc
@@ -137,6 +141,27 @@ class LoadManager(BaseWorkerService):
     def unmonitor_service(self, service_name):
         self.mongo.services.delete_many({'name': service_name})
         self.trigger.delete(self.name, service_name)
+
+    @rpc
+    @log_all
+    def list_service(self):
+        """
+        list all registered services with their metadata
+        :return:
+        """
+        return [filter_dict(s) for s in self.mongo.services.find()]
+
+    @rpc
+    @log_all
+    def get_service(self, service_name):
+        """
+        return all current state for the given service.
+        :param service_name: the service's name
+        :return: all internal data from db
+        """
+
+        service = self._get_service(service_name)
+        return service and filter_dict(service)
 
     # #######################################
     # private database helpers

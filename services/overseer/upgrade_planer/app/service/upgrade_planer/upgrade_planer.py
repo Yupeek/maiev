@@ -314,9 +314,15 @@ class UpgradePlaner(BaseWorkerService):
             })
 
         # we just handle finished changes: complited event or update of 0 replicas service
-        if payload['diff'].get('state', {}).get('to') == 'completed' or \
-                payload['service']['mode'] == {'name': 'replicated', 'replicas': 0}:
+        completed_ = payload['diff'].get('state', {}).get('to') == 'completed'
+        replicas_ = payload['service']['mode'] == {'name': 'replicated', 'replicas': 0}
+        if from_version == version_:
+            logger.debug("stayed at version %s: this is not an upgrade", from_version)
+        elif completed_ or replicas_:
+            logger.debug("continue plans: <completed_=%s replicas_=%s>", completed_, replicas_)
             self.continue_scheduled_plan(service, from_version, version_)
+        else:
+            logger.debug("notification inused: <completed_=%s replicas_=%s>", completed_, replicas_)
 
     @event_handler(
         "overseer", "cleaned_image", handler_type=SERVICE_POOL, reliable_delivery=True
@@ -508,7 +514,6 @@ class UpgradePlaner(BaseWorkerService):
         :param str to_version:
         :return:
         """
-
         running_scheduled = self.mongo.scheduling.find_one({"state": RUNNING})
         if running_scheduled is None:
             # nothing to do since it was not a part of a running upgrade plan
@@ -539,9 +544,9 @@ class UpgradePlaner(BaseWorkerService):
         elif next_step is None:
             # the last service was the current one.
             # this upgrade is done
-            logger.info("scheduling is finished %s", running_scheduled)
             updated_step['state'] = DONE
             running_scheduled['state'] = DONE
+            logger.info("scheduling is finished %s", running_scheduled)
         else:
             # we are still in a upgrade plan
             updated_step['state'] = DONE

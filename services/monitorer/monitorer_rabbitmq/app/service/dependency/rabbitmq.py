@@ -9,12 +9,14 @@ from nameko.extensions import DependencyProvider
 
 logger = logging.getLogger(__name__)
 RABBITMQ_URLS_KEY = 'MONITORED_SERVER_URL'
+RABBITMQ_VHOST_KEY = 'MONITORED_SERVER_VHOST'
 
 
 class RabbitMqApi(object):
-    def __init__(self, base_url):
+    def __init__(self, base_url, vhost='/'):
         self.base_url = base_url.lstrip('/') + '/'
         self.session = requests.session()
+        self.vhost = vhost
 
     def _get(self, *url_parts, params=None):
         final_url = urllib.parse.urljoin(self.base_url, "/".join([urllib.parse.quote(p, '') for p in url_parts]))
@@ -38,7 +40,7 @@ class RabbitMqApi(object):
             raise
 
     def get_queue_stats(self, qname, **extra):
-        return self._get('queues', '/', qname, params=extra)
+        return self._get('queues', self.vhost, qname, params=extra)
 
 
 class RabbitMq(DependencyProvider):
@@ -57,14 +59,17 @@ class RabbitMq(DependencyProvider):
         url = urllib.parse.urlunparse(('http', netloc, 'api',) + ('',) * 3)
         return url
 
+    def get_default_vhost(self):
+        broker = self.container.config['AMQP_URI']
+        parsed = urllib.parse.urlparse(broker)
+        return parsed.path.lstrip('/') if parsed.path != '/' else parsed.path
+
     def setup(self):
         self.rabbitmq_url = self.container.config.get(RABBITMQ_URLS_KEY) or self.get_default_url()
-
-    def get_default_name(self):
-        return '%s_mongodb' % self.container.service_cls.name
+        self.rabbitmq_vhost = self.container.config.get(RABBITMQ_VHOST_KEY) or self.get_default_vhost()
 
     def start(self):
-        self.api = RabbitMqApi(self.rabbitmq_url)
+        self.api = RabbitMqApi(self.rabbitmq_url, self.rabbitmq_vhost)
 
     def stop(self):
         self.api = None

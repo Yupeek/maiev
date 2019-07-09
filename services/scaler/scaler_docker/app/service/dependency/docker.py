@@ -17,6 +17,18 @@ class DockerClientProvider(DependencyProvider):
         else:
             self.client = client.from_env()
         self.client.info()
+        self.event_handlers = []
+
+    def stop(self):
+        for ev in self.event_handlers:
+            ev.close()
 
     def get_dependency(self, worker_ctx):
+        old_ev = self.client.events
+
+        def events(*args, **kwargs):
+            res = old_ev(*args, **kwargs)
+            self.event_handlers.append(res)
+            return res
+        self.client.events = events
         return self.client

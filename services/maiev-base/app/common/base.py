@@ -53,17 +53,35 @@ class BaseWorkerService(object):
 
             try:
                 sig = inspect.signature(f)
-                ret = [
+                return [
                     k
                     for k, v in sig.parameters.items()
                     if v.kind in _keeps and k != 'self'
                 ]
             except Exception:
-                logger.exception()
-            return ret
+                logger.exception('exception while listing rpc commands')
+                return []
 
         return {
             f.__name__: get_kwargs(f)
             for f in self.__class__.__dict__.values()
             if 'Rpc' in (e.__class__.__name__ for e in getattr(f, "nameko_entrypoints", []))
         }
+
+    @rpc
+    @log_all
+    def test_logging(self):
+        """
+        provide the current config for debugging
+        :return:
+        """
+        logger = logging.getLogger("%s.testlog" % self.name)
+        logger.debug('this is a fake debug message ')
+        logger.info('this is a fake debug message ')
+        logger.warning('this is a fake debug message ')
+        logger.error('this is a fake debug message ')
+        try:
+            raise Exception("fake exception handled triggered by hand")
+        except Exception as e:
+            logger.exception('this is a fake debug message: %s' % e)
+        raise Exception("fake exception unhandled triggered by hand")

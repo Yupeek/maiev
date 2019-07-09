@@ -2,6 +2,7 @@
 import mock
 import pytest
 
+from service.dependency.rabbitmq import RabbitMq, RabbitMqApi
 from service.monitorer_rabbitmq.monitorer_rabbitmq import MonitorerRabbitmq
 
 
@@ -79,6 +80,62 @@ def monitorer(rmq_result):
     m.mongo = mock.Mock()
 
     return m
+
+
+def dp_rabbitmq_factory(param) -> RabbitMq:
+    m = RabbitMq()
+    m.container = mock.Mock(config={
+        'AMQP_URI': param['AMQP_URI']
+    })
+    return m
+
+
+@pytest.fixture
+def dp_rabbitmq():
+    return dp_rabbitmq_factory({'AMQP_URI': 'amqp://maiev:Paaswd@rbmq/gmd'})
+
+
+def rabbitm_api_factory(param) -> RabbitMqApi:
+    api = RabbitMqApi(param['API_URL'], param['vhost'])
+    api.session = mock.Mock()
+    return api
+
+
+@pytest.fixture
+def rabbitm_api():
+    return rabbitm_api_factory({'API_URL': 'http://maiev:Paaswd@rbmq:15672/api', 'vhost': '/'})
+
+
+class TestRabbitmAPI(object):
+
+    @pytest.mark.parametrize('env', [
+        {'API_URL': 'http://maiev:Paaswd@rbmq:15672/api', 'vhost': '/', 'AMQP_URI': 'amqp://maiev:Paaswd@rbmq/'},
+        {'API_URL': 'http://maiev:Paaswd@rbmq:15672/api', 'vhost': 'gmd', 'AMQP_URI': 'amqp://maiev:Paaswd@rbmq/gmd'},
+    ], ids=['/', 'gmd'])
+    def test_default_vhost(self, env):
+        rabbitmq = dp_rabbitmq_factory(env)
+
+        assert rabbitmq.get_default_url() == env['API_URL']
+        assert rabbitmq.get_default_vhost() == env['vhost']
+
+    @pytest.mark.parametrize('env', [
+        {'API_URL': 'http://maiev:Paaswd@rbmq:15672/api',
+         'vhost': '/', 'vhost_enc': '%2F', 'AMQP_URI': 'amqp://maiev:Paaswd@rbmq/'},
+        {'API_URL': 'http://maiev:Paaswd@rbmq:15672/api',
+         'vhost': 'gmd', 'vhost_enc': 'gmd', 'AMQP_URI': 'amqp://maiev:Paaswd@rbmq/gmd'},
+    ], ids=['/', 'gmd'])
+    def test_api_query(self, env):
+        api = rabbitm_api_factory(env)
+        api.session.get.return_value = mock.Mock(
+            status_code=200,
+            json=mock.Mock(return_value={u'consumers': 1, u'messages_ready': 0}),
+            status_text='ok',
+        )
+        r = api.get_queue_stats('rpc-wrapper-service')
+        assert r == {u'consumers': 1, u'messages_ready': 0}
+        api.session.get.assert_called_once_with(
+            "%(API_URL)s/queues/%(vhost_enc)s/rpc-wrapper-service" % env
+        )
 
 
 class TestMonitorQueue(object):
