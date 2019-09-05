@@ -4,6 +4,7 @@ import datetime
 import logging
 import os
 import random
+import sys
 from unittest import TestCase
 
 import mock
@@ -349,7 +350,7 @@ class TestConputeResults(TriggerTestcase):
             ]
         }
         ruleset = self.add_history(ruleset, resources={'rmq': [{'rate': 1}, 0]})
-        self.assertEqual(self.service.compute(ruleset), {
+        expected = {
             "status": "error",
             "exception": 'Expected end of text (at char 13), (line:1, col:14)',
             "exception_type": "ParseException",
@@ -358,7 +359,10 @@ class TestConputeResults(TriggerTestcase):
                 "loc": 13,
                 "pstr": 'rmq:rate < 0 & lol and rate < 0'
             }
-        })
+        }
+        if sys.version_info > (3, 6, 6):
+            expected['exception'] = "Expected end of text, found '&'  (at char 13), (line:1, col:14)"
+        self.assertEqual(self.service.compute(ruleset), expected)
 
     def test_scope_error(self):
         ruleset = {
