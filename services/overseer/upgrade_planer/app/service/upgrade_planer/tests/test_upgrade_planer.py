@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
+import json
 import logging
+import os
+from functools import reduce
 
 import mock
 # other MS
@@ -420,39 +423,39 @@ class TestStepComputing(object):
         [
             (  # upgrade two version with only one backward compat
 
-                {'a': "2", "b": "2"},
-                {'a': "1", "b": "1"},
-                [{'a': "2", "b": "1"}],
-                [('a', '1', '2'), ('b', '1', '2')],
+                    {'a': "2", "b": "2"},
+                    {'a': "1", "b": "1"},
+                    [{'a': "2", "b": "1"}],
+                    [('a', '1', '2'), ('b', '1', '2')],
             ),
             (  # upgrade two version with only the other backward compat
 
-                {'a': "2", "b": "2"},
-                {'a': "1", "b": "1"},
-                [{'a': "1", "b": "2"}],
-                [('b', '1', '2'), ('a', '1', '2')],
+                    {'a': "2", "b": "2"},
+                    {'a': "1", "b": "1"},
+                    [{'a': "1", "b": "2"}],
+                    [('b', '1', '2'), ('a', '1', '2')],
             ),
             (  # goal is already applyed
 
-                {'a': "2", "b": "2"},
-                {'a': "2", "b": "2"},
-                [],
-                [],
+                    {'a': "2", "b": "2"},
+                    {'a': "2", "b": "2"},
+                    [],
+                    [],
             ),
             (  # one service to update
 
-                {'a': "2", "b": "1"},
-                {'a': "1", "b": "1"},
-                [{'a': "2", "b": "1"}],
-                [('a', '1', '2')],
+                    {'a': "2", "b": "1"},
+                    {'a': "1", "b": "1"},
+                    [{'a': "2", "b": "1"}],
+                    [('a', '1', '2')],
             ),
             (  # 3 services
 
-                {'a': "2", "b": "2", 'c': '2'},
-                {"a": "1", "b": "1", "c": "1"},
-                [{"a": "1", "b": "1", "c": "2"}, {"a": "1", "b": "2", "c": "2"},
-                 {"a": "1", "b": "2", "c": "1"}],
-                [('b', '1', '2'), ('c', '1', '2',), ('a', '1', '2')],
+                    {'a': "2", "b": "2", 'c': '2'},
+                    {"a": "1", "b": "1", "c": "1"},
+                    [{"a": "1", "b": "1", "c": "2"}, {"a": "1", "b": "2", "c": "2"},
+                     {"a": "1", "b": "2", "c": "1"}],
+                    [('b', '1', '2'), ('c', '1', '2',), ('a', '1', '2')],
             )
         ])
     def test_build_steps_bad_solution(self, goal_param, current_state, compatible_phase, expected, upgrade_planer):
@@ -591,7 +594,6 @@ class TestSolveBestPhase(object):
         assert goal == [[{"name": "producer", }, "1.0.1"], [{"name": "consumer", }, "1.0.17"]]
 
     def test_get_latest_phase(self, upgrade_planer: UpgradePlaner):
-
         upgrade_planer.mongo.catalog.find.return_value = [
             {"name": "producer", "versions_list": self.build_catalog("producer", ["1.0.5", "1.0.16", "1.0.17"])},
             {"name": "consumer", "versions_list": self.build_catalog("consumer", ["1.0.5", "1.0.17"])},
@@ -601,7 +603,6 @@ class TestSolveBestPhase(object):
         assert {"producer": "1.0.17", "consumer": "1.0.17"} == s
 
     def test_get_latest_phase_beta(self, upgrade_planer: UpgradePlaner):
-
         upgrade_planer.mongo.catalog.find.return_value = [
             {"name": "producer", "versions_list": self.build_catalog("producer", ["1.0.5", "1.0.16b", "1.0.17"])},
             {"name": "consumer", "versions_list": self.build_catalog("consumer", ["1.0.5", "1.0.17b"])},
@@ -609,3 +610,32 @@ class TestSolveBestPhase(object):
 
         s = upgrade_planer.get_latest_phase()
         assert {"producer": "1.0.17", "consumer": "1.0.17b"} == s
+
+
+class TestPerfRealData(object):
+
+    def load_sample(self, sample):
+        with open(os.path.join(os.path.dirname(__file__), 'samples', sample)) as f:
+            return json.load(f)
+
+    def test_sample1_get_latest(self, upgrade_planer: UpgradePlaner):
+        upgrade_planer.mongo.catalog.find.return_value = self.load_sample('sample1.json')['catalog']
+        s = upgrade_planer.get_latest_phase()
+        assert s == {
+            'http_to_rpc': '0.1.24',
+            'joboffer_algolia_publisher': '0.1.24',
+            'joboffer_fetcher': '0.1.24',
+            'joboffer_xml_publisher': '0.1.24',
+            'maiev': '1.3.0',
+            'yupeeposting-backend': '0.2.65',
+            'yupeeposting-webui': '0.2.64'}
+
+    def test_sample1_build_catalog(self, upgrade_planer: UpgradePlaner):
+        upgrade_planer.mongo.catalog.find.return_value = self.load_sample('sample1.json')['catalog']
+        catalog = upgrade_planer.build_catalog()
+
+        total = reduce(lambda a, b: a * b, (len(service['versions']) for service in catalog), 1)
+        assert total == 8640
+        reduced = upgrade_planer.reduce_catalog(catalog)
+        total_reduced = reduce(lambda a, b: a * b, (len(service['versions']) for service in reduced), 1)
+        assert total_reduced == 32

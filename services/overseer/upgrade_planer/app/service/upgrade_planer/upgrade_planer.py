@@ -691,6 +691,20 @@ class UpgradePlaner(BaseWorkerService):
                                len(service['versions']), filter_name, service['name'])
         return res
 
+    def reduce_catalog(self, catalog):
+        for service in catalog:
+            versions = []
+            known_req = []
+            for version_number, version_metadata in sorted(service['versions'].items(), key=lambda v: v[0]):
+                if version_metadata not in known_req:
+                    versions.append((version_number, version_metadata))
+                    known_req.append(version_metadata)
+
+            service['versions'] = dict(versions)
+        return catalog
+
+
+
     def solve_best_phase(self, phases):
         """
         solve the best phase

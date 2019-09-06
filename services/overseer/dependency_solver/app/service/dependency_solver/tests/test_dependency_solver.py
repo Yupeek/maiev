@@ -1,10 +1,21 @@
 # -*- coding: utf-8 -*-
 import copy
+import json
 import logging
+import os
+import time
 
-from service.dependency_solver.dependency_solver import Solver
+import pytest
+
+from service.dependency_solver.dependency_solver import Solver, DependencySolver
 
 logger = logging.getLogger(__name__)
+
+
+@pytest.fixture
+def dependency_solver():
+    service = DependencySolver()
+    return service
 
 
 class TestSolver:
@@ -320,3 +331,27 @@ class TestExplain(object):
 
         result = list(s.solve())
         assert len(result) == 1
+
+
+class TestPerfRealData(object):
+    def load_sample(self, sample):
+        with open(os.path.join(os.path.dirname(__file__), 'samples', sample)) as f:
+            return json.load(f)
+
+    def test_solve_dependency_1(self, dependency_solver: DependencySolver):
+
+        payload = self.load_sample('sample1.json')
+        result = dependency_solver.solve_dependencies(*payload)
+        assert result == {}
+
+    def test_solve_dep_no_service(self):
+        catalog = self.load_sample('sample1.json')[0]
+        s = Solver(catalog, [], debug=True)
+        begin = time.time()
+        solved = list(s.solve())
+        end = time.time()
+
+        assert len(solved) == 96
+        assert [r[1] for r in solved[0]] == ['0.2.62', '0.2.57', '0.1.19', '0.1.24', '0.1.24', '0.1.19', '1.2.0']
+        assert end - begin < 14
+
