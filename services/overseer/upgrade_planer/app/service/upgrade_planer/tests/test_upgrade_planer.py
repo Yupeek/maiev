@@ -98,6 +98,34 @@ def service():
 
 
 @pytest.fixture
+def catalog(service):
+    return [{
+        "name": "consumer",
+        "service": service['consumer'],
+        "versions_list": [
+            {"version": "1.0.16", "dependencies": {
+                "require": [
+                    "producer:rpc:echo"
+                ]
+            }}],
+
+        "version": service['consumer']['image']['image_info']['version'],
+    }, {
+        "name": "producer",
+        "service": service['producer'],
+        "versions_list": [
+            {"version": "1.0.16", "dependencies": {
+                "provide": {
+                    "producer:rpc:echo": 1
+                }}}
+        ],
+        "version": service['producer']['image']['image_info']['version'],
+
+    }
+    ]
+
+
+@pytest.fixture
 def upgrade_planer():
     service = UpgradePlaner()
     service.mongo = mock.Mock()
@@ -107,6 +135,7 @@ def upgrade_planer():
 
 
 class TestUpgradePlaner(object):
+
     def test_update_catalog_new_service(self, event_payload, upgrade_planer: UpgradePlaner):
         upgrade_planer.mongo.catalog.find_one.return_value = None
         upgrade_planer.on_new_version(event_payload)
@@ -403,6 +432,59 @@ class TestUpgradePlaner(object):
             }
         ]
 
+    def test_resolve_upgrade_and_steps_no_goal(self, upgrade_planer: UpgradePlaner, catalog):
+        upgrade_planer.build_catalog = mock.Mock(return_value=catalog)
+        upgrade_planer.dependency_solver.solve_dependencies = mock.Mock(return_value={
+            "results": [{"producer": "1.0.16", "consumer": "1.0.16"}],
+            "errors": [],
+            "anomalies": []
+        })
+        bp = Phase([PhasePin(catalog[1], "1.0.16"),
+                    PhasePin(catalog[0], "1.0.16")])
+        upgrade_planer.solve_best_phase = mock.Mock(return_value=(None, 0))
+        upgrade_planer.build_steps = mock.Mock()
+
+        res = upgrade_planer.resolve_upgrade_and_steps()
+
+        upgrade_planer.solve_best_phase.assert_called_with([bp])
+        assert not upgrade_planer.build_steps.called
+        assert res['result']['best_phase'] is None
+
+    def test_resolve_upgrade_and_steps_with_goal(self, upgrade_planer: UpgradePlaner, catalog):
+        upgrade_planer.build_catalog = mock.Mock(return_value=catalog)
+        upgrade_planer.dependency_solver.solve_dependencies = mock.Mock(return_value={
+            "results": [{"producer": "1.0.16", "consumer": "1.0.16"}],
+            "errors": [],
+            "anomalies": []
+        })
+        bp = Phase([PhasePin(catalog[1], "1.0.16"),
+                    PhasePin(catalog[0], "1.0.16")])
+        upgrade_planer.solve_best_phase = mock.Mock(return_value=(bp, 1))
+        upgrade_planer.build_steps = mock.Mock()
+
+        res = upgrade_planer.resolve_upgrade_and_steps()
+
+        upgrade_planer.solve_best_phase.assert_called_with([bp])
+        upgrade_planer.build_steps.assert_called_with(bp)
+
+        assert res['result']['best_phase'] == bp
+
+    def test_resolve_upgrade_and_steps_with_error(self, upgrade_planer: UpgradePlaner, catalog):
+        upgrade_planer.build_catalog = mock.Mock(return_value=catalog)
+        upgrade_planer.dependency_solver.solve_dependencies = mock.Mock(return_value={
+            "results": [],
+            "errors": ["ceci est une erreur"],
+            "anomalies": []
+        })
+
+        res = upgrade_planer.resolve_upgrade_and_steps()
+
+        print(res)
+        assert res == {
+            'result': None,
+            'errors': {'step': 'dependency_solve', 'error': ['ceci est une erreur'], 'catalog': catalog}
+        }
+
 
 class TestStepComputing(object):
 
@@ -423,39 +505,39 @@ class TestStepComputing(object):
         [
             (  # upgrade two version with only one backward compat
 
-                    {'a': "2", "b": "2"},
-                    {'a': "1", "b": "1"},
-                    [{'a': "2", "b": "1"}],
-                    [('a', '1', '2'), ('b', '1', '2')],
+                {'a': "2", "b": "2"},
+                {'a': "1", "b": "1"},
+                [{'a': "2", "b": "1"}],
+                [('a', '1', '2'), ('b', '1', '2')],
             ),
             (  # upgrade two version with only the other backward compat
 
-                    {'a': "2", "b": "2"},
-                    {'a': "1", "b": "1"},
-                    [{'a': "1", "b": "2"}],
-                    [('b', '1', '2'), ('a', '1', '2')],
+                {'a': "2", "b": "2"},
+                {'a': "1", "b": "1"},
+                [{'a': "1", "b": "2"}],
+                [('b', '1', '2'), ('a', '1', '2')],
             ),
             (  # goal is already applyed
 
-                    {'a': "2", "b": "2"},
-                    {'a': "2", "b": "2"},
-                    [],
-                    [],
+                {'a': "2", "b": "2"},
+                {'a': "2", "b": "2"},
+                [],
+                [],
             ),
             (  # one service to update
 
-                    {'a': "2", "b": "1"},
-                    {'a': "1", "b": "1"},
-                    [{'a': "2", "b": "1"}],
-                    [('a', '1', '2')],
+                {'a': "2", "b": "1"},
+                {'a': "1", "b": "1"},
+                [{'a': "2", "b": "1"}],
+                [('a', '1', '2')],
             ),
             (  # 3 services
 
-                    {'a': "2", "b": "2", 'c': '2'},
-                    {"a": "1", "b": "1", "c": "1"},
-                    [{"a": "1", "b": "1", "c": "2"}, {"a": "1", "b": "2", "c": "2"},
-                     {"a": "1", "b": "2", "c": "1"}],
-                    [('b', '1', '2'), ('c', '1', '2',), ('a', '1', '2')],
+                {'a': "2", "b": "2", 'c': '2'},
+                {"a": "1", "b": "1", "c": "1"},
+                [{"a": "1", "b": "1", "c": "2"}, {"a": "1", "b": "2", "c": "2"},
+                 {"a": "1", "b": "2", "c": "1"}],
+                [('b', '1', '2'), ('c', '1', '2',), ('a', '1', '2')],
             )
         ])
     def test_build_steps_bad_solution(self, goal_param, current_state, compatible_phase, expected, upgrade_planer):

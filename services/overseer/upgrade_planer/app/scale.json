@@ -4,7 +4,7 @@
   "dependencies": {
     "require": [
       "dependency_solver:rpc:explain > 0",
-      "dependency_solver:rpc:solve_dependencies > 0",
+      "dependency_solver:rpc:solve_dependencies > 1",
       "overseer:rpc:get_service > 0",
       "overseer:rpc:upgrade_service > 0",
       "overseer:event:service_updated > 0",

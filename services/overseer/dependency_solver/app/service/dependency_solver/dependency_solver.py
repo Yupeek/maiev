@@ -215,7 +215,7 @@ class Solver(object):
                 if pined in encountered_solutions:
                     continue
                 encountered_solutions.append(pined)
-                yield solution
+                yield pined
         logger.debug("%d solutions found in %d backtrack", len(encountered_solutions), self.backtrack_count)
 
     def explain(self):
@@ -270,7 +270,7 @@ class Solver(object):
                             "provided": provided
                         })
                     return False
-        except (ScopeError, KeyError) as e:
+        except ScopeError as e:
             if self.debug:
                 self.failed.append({
                     "expression": require.original_string,
@@ -282,6 +282,10 @@ class Solver(object):
                 "service": service['name'],
                 "error": repr(e)
             })
+            return False
+        except KeyError:
+            # keyerror mean the requirement is not provided yet, but it's not a scope
+            # error, so the requirement exists somewhere in the provide
             return False
         else:
             return True

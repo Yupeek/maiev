@@ -587,7 +587,15 @@ class UpgradePlaner(BaseWorkerService):
                     "catalog": catalog
                 }
             }
-        phases = [Phase.deserialize(phase) for phase in solved_phases['results']]
+        services_by_names = {
+            service['name']: service
+            for service in catalog
+        }
+
+        phases = [
+            Phase.deserialize([(services_by_names[k], v) for k, v in phase.items()])
+            for phase in solved_phases['results']
+        ]
         logger.debug("resolved phases : %s", phases)
         goal, rank = self.solve_best_phase(phases)  # type: Phase[PhasePin], int
         """
@@ -702,8 +710,6 @@ class UpgradePlaner(BaseWorkerService):
 
             service['versions'] = dict(versions)
         return catalog
-
-
 
     def solve_best_phase(self, phases):
         """
