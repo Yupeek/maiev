@@ -21,7 +21,7 @@ TRAVIS_BUILD_NUMBER ?= dev
 SERVICE_FORCE_PUSH ?= \0
 
 # version defining
-IMAGE_VERSION ?= $(shell test -f version && cat version || echo "1.0").$(TRAVIS_BUILD_NUMBER)b
+IMAGE_VERSION ?= $(shell test -f version && cat version || echo "1.0")-$(TRAVIS_BUILD_NUMBER)b
 FULL_IMAGE_ID ?= $(IMAGE_NAME):$(SERVICE_NAME)-$(IMAGE_VERSION)
 TMP_IMAGE_NAME ?= $(SERVICE_NAME):$(TARGET)
 

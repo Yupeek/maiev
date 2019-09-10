@@ -693,6 +693,30 @@ class TestSolveBestPhase(object):
         s = upgrade_planer.get_latest_phase()
         assert {"producer": "1.0.17", "consumer": "1.0.17b"} == s
 
+    def test_get_latest_phase_beta_real(self, upgrade_planer: UpgradePlaner):
+        upgrade_planer.mongo.catalog.find.return_value = [
+            {"name": "producer", "versions_list": self.build_catalog(
+                "producer", ['1.1-93b', '1.1-79b', '1.1-73b', '1.1-77b', '1.1-78b', '1.1-71b', '1.1-87b', '1.1-64b',
+                             '1.1-89b', '1.1-84b', '1.1-86b', '1.1-65b', '1.1-88b', '1.1-96b', '1.1-97b', '1.1-98b',
+                             '1.1-99b', '1.1-100b', '1.1-101b', '1.1-103b', '1.1-104b', '1.1-106b', '1.1-107b',
+                             '1.1-108b', '1.3.0-110b', '1.3.0-114b', '1.3.0-119b'])},
+            {"name": "consumer", "versions_list": self.build_catalog("consumer", ["1.0.5", "1.0-17b"])},
+        ]
+
+        s = upgrade_planer.get_latest_phase()
+        assert {"producer": "1.3.0-119b", "consumer": "1.0.5"} == s
+
+    def test_sort_version(self, upgrade_planer: UpgradePlaner):
+        versions = ['1.1.4-108b', '1.3.0-110b', '1.3.0-114b', '1.3.0-119b']
+        sorted_v = upgrade_planer.sort_versions(self.build_catalog("producer", versions))
+        assert sorted_v == ['1.3.0-119b', '1.3.0-114b', '1.3.0-110b', '1.1.4-108b']
+
+    def test_sort_mixed_version(self, upgrade_planer: UpgradePlaner):
+        versions = ['1.1.4.108b', '1.3.0.110b', '1.3.0.114b', '1.3.0.119b', '1.3.1-120b', '1.3.1-125b']
+        sorted_v = upgrade_planer.sort_versions(self.build_catalog("producer", versions))
+
+        assert sorted_v == ['1.3.1-125b', '1.3.1-120b', '1.3.0.110b', '1.3.0.114b', '1.3.0.119b', '1.1.4.108b']
+
 
 class TestPerfRealData(object):
 
