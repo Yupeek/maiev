@@ -113,7 +113,8 @@ class LoadManager(BaseWorkerService):
                 continue
             seconds = (now - date).total_seconds()
             if (rule['__scale_up__'] or rule['__scale_down__']) and seconds > 30:
-                logger.debug("reexecuting ruleset because fixed since %s sec: rulset=%s", seconds, rule)
+                logger.debug("reexecuting ruleset for service %s because fixed since %s sec: rulset=%s",
+                             service['name'], seconds, rule)
                 self._execute_ruleset(rule, service)
 
     @rpc

@@ -2,9 +2,11 @@
 
 import logging
 import urllib.parse
+from http.client import RemoteDisconnected
 from json.decoder import JSONDecodeError
 
 import requests
+from eventlet import sleep
 from nameko.extensions import DependencyProvider
 
 logger = logging.getLogger(__name__)
@@ -22,13 +24,20 @@ class RabbitMqApi(object):
         final_url = urllib.parse.urljoin(self.base_url, "/".join([urllib.parse.quote(p, '') for p in url_parts]))
         if params:
             final_url += "?%s" % urllib.parse.urlencode(params)
-        try:
-            response = self.session.get(final_url)
-        except Exception:
-            logger.exception("error while connecting to %s", final_url)
-            return None
+        response = None
+        for _ in range(3):  # retry 3 times
+            try:
+                response = self.session.get(final_url)
+            except RemoteDisconnected :
+                self.session = requests.session()
+                sleep(1)  # throthle queries
+            except Exception:
+                logger.exception("error while connecting to %s", final_url)
+                return None
+            else:
+                break
 
-        if response.status_code == 404:
+        if response is None or response.status_code == 404:
             return None
         try:
             return response.json()
