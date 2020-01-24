@@ -28,7 +28,7 @@ class RabbitMqApi(object):
         for _ in range(3):  # retry 3 times
             try:
                 response = self.session.get(final_url)
-            except RemoteDisconnected :
+            except RemoteDisconnected:
                 self.session = requests.session()
                 sleep(1)  # throthle queries
             except Exception:
