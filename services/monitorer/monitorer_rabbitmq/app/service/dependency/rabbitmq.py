@@ -2,13 +2,12 @@
 
 import logging
 import urllib.parse
-from requests.exceptions import ConnectionError
-
 from json.decoder import JSONDecodeError
 
 import requests
 from eventlet import sleep
 from nameko.extensions import DependencyProvider
+from requests.exceptions import ConnectionError
 
 logger = logging.getLogger(__name__)
 RABBITMQ_URLS_KEY = 'MONITORED_SERVER_URL'
