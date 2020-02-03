@@ -128,6 +128,7 @@ def catalog(service):
 @pytest.fixture
 def upgrade_planer():
     service = UpgradePlaner()
+    service.config = {}
     service.mongo = mock.Mock()
     service.dispatch = mock.Mock()
     service.dependency_solver = mock.Mock()
@@ -466,6 +467,28 @@ class TestUpgradePlaner(object):
 
         upgrade_planer.solve_best_phase.assert_called_with([bp])
         upgrade_planer.build_steps.assert_called_with(bp)
+
+        assert res['result']['best_phase'] == bp
+
+    def test_resolve_upgrade_and_steps_with_resolution_disabled(self, upgrade_planer: UpgradePlaner, catalog):
+        upgrade_planer.config['solve_dependencies'] = False
+        upgrade_planer.build_catalog = mock.Mock(return_value=catalog)
+        upgrade_planer.dependency_solver.solve_dependencies = mock.Mock(return_value={
+            "results": [],
+            "errors": [],
+            "anomalies": []
+        })
+        bp = Phase([PhasePin(catalog[1], "1.0.16"),
+                    PhasePin(catalog[0], "1.0.16")])
+        upgrade_planer.get_latest_phase = mock.Mock(return_value={catalog[1]['name']: "1.0.16", catalog[0]['name']: "1.0.16"})
+        upgrade_planer.solve_best_phase = mock.Mock(return_value=(bp, 1))
+        upgrade_planer.build_steps = mock.Mock()
+
+        res = upgrade_planer.resolve_upgrade_and_steps()
+
+        upgrade_planer.solve_best_phase.assert_called_with([bp])
+        upgrade_planer.build_steps.assert_called_with(bp)
+        upgrade_planer.dependency_solver.solve_dependencies.assert_not_called()
 
         assert res['result']['best_phase'] == bp
 

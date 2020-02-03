@@ -573,7 +573,16 @@ class UpgradePlaner(BaseWorkerService):
              catalog: $catalog
         """
         catalog = self.build_catalog()
-        solved_phases = self.dependency_solver.solve_dependencies(catalog)
+        if self.config.get('solve_dependencies', True):
+            # feature realy cpu heavy and algo is O(n**n) :(
+            solved_phases = self.dependency_solver.solve_dependencies(catalog)
+        else:
+            # workaround for hanging resolution
+            solved_phases = {
+                "results": [self.get_latest_phase()],
+                "errors": [],
+                "anomalies": []
+            }
         """
         phase is the result of a solved state. it contains the list of possible states.
         each states is a list of tuple with a service and his pined version.

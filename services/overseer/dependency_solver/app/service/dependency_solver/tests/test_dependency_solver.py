@@ -333,6 +333,22 @@ class TestPerfRealData(object):
         assert result['anomalies'] == []
         assert result['errors'] == []
 
+    @pytest.skip("bad perfs prohibit this test")
+    def test_solve_dependency_2(self, dependency_solver: DependencySolver):
+        payload = self.load_sample('sample2.json')
+        result = dependency_solver.solve_dependencies(payload)
+        assert len(result['results']) == 96
+        assert result['results'][-1] == {
+            'http_to_rpc': '0.1.19',
+            'joboffer_algolia_publisher': '0.1.24',
+            'joboffer_fetcher': '0.1.22',
+            'joboffer_xml_publisher': '0.1.19',
+            'maiev': '1.2.0',
+            'yupeeposting-backend': '0.2.55',
+            'yupeeposting-webui': '0.2.56'}
+        assert result['anomalies'] == []
+        assert result['errors'] == []
+
     def test_solve_dep_no_service(self):
         catalog = self.load_sample('sample1.json')[0]
         s = Solver(catalog, [], debug=True)

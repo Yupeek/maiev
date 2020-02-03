@@ -1,0 +1,674 @@
+[
+  {
+    "name": "gmd_maiev",
+    "versions": {
+      "122b": {
+        "provide": {
+          "dependency_solver:rpc:solve_dependencies": 2,
+          "dependency_solver:rpc:solve_dependencies:args": [
+            "catalog",
+            "extra_constraints"
+          ],
+          "dependency_solver:rpc:solve_dependencies:rtype": [
+            "list[dict]"
+          ],
+          "dependency_solver:rpc:explain": 1,
+          "dependency_solver:rpc:explain:args": [
+            "catalog",
+            "extra_constraints"
+          ],
+          "dependency_solver:rpc:explain:rtype": [
+            "results"
+          ],
+          "upgrade_planer:event:new_version": 1,
+          "upgrade_planer:rpc:list_catalog": 1,
+          "upgrade_planer:rpc:explain_phase": 1,
+          "upgrade_planer:rpc:get_latest_phase": 1,
+          "upgrade_planer:rpc:run_available_upgrade": 1,
+          "upgrade_planer:rpc:continue_scheduled_plan": 1,
+          "upgrade_planer:rpc:resolve_upgrade_and_steps": 1,
+          "overseer:rpc": 1,
+          "overseer:rpc:scale": 1,
+          "overseer:rpc:monitor": 1,
+          "overseer:rpc:list_service": 1,
+          "overseer:rpc:get_service": 1,
+          "overseer:rpc:unmonitor_service": 1,
+          "overseer:rpc:test": 1,
+          "overseer:rpc:upgrade_service": 1,
+          "overseer:event:service_updated": 1,
+          "overseer:event:new_image": 1,
+          "load_manager:rpc:monitor_service": 1,
+          "load_manager:rpc:unmonitor_service": 1,
+          "load_manager:event:scale": 1,
+          "load_manager:event:scale:params": [
+            "scale",
+            "extra_constraints"
+          ],
+          "scaler_docker:http": 1,
+          "scaler_docker:event:service_updated": 1,
+          "scaler_docker:event:image_updated": 1,
+          "scaler_docker:rpc:update": 1,
+          "scaler_docker:rpc:get": 1,
+          "scaler_docker:rpc:list_services": 1,
+          "scaler_docker:rpc:fetch_image_config": 1,
+          "monitorer:rabbitmq": true,
+          "monitorer_rabbitmq:event:metrics_updated": 2,
+          "monitorer_rabbitmq:event:metrics_updated:params": [
+            "monitorer",
+            "identifier",
+            "metrics",
+            "metrics.exists",
+            "metrics.waiting",
+            "metrics.latency",
+            "metrics.rate",
+            "metrics.call_rate",
+            "metrics.exec_rate",
+            "metrics.consumers"
+          ],
+          "monitorer_rabbitmq:rpc:track": 1,
+          "monitorer_rabbitmq:rpc:track:args": [
+            "queue_identifier"
+          ],
+          "trigger:rpc:compute": 1,
+          "trigger:rpc:compute:args": [
+            "ruleset"
+          ],
+          "trigger:rpc:add": 1,
+          "trigger:rpc:add:args": [
+            "ruleset"
+          ],
+          "trigger:rpc:delete": 1,
+          "trigger:rpc:delete:args": [
+            "owner",
+            "rule_name"
+          ],
+          "trigger:rpc:purge": 1,
+          "trigger:rpc:purge:args": [
+            "owner"
+          ],
+          "trigger:rpc:list": 1,
+          "trigger:rpc:list:args": [
+            "_filter"
+          ],
+          "trigger:event:ruleset_triggered": 1,
+          "trigger:event:ruleset_triggered:params": [
+            "ruleset",
+            "rules_stats"
+          ],
+          "scaler_docker:rpc:dump": 1
+        },
+        "require": [
+          "dependency_solver:rpc:explain > 0",
+          "dependency_solver:rpc:solve_dependencies > 1",
+          "overseer:rpc:get_service > 0",
+          "overseer:rpc:upgrade_service > 0",
+          "overseer:event:service_updated > 0",
+          "overseer:event:new_image > 0",
+          "scaler_docker:rpc:fetch_image_config > 0",
+          "scaler_docker:rpc:list_services > 0",
+          "scaler_docker:rpc:update > 0",
+          "load_manager:rpc:monitor_service > 0",
+          "overseer:rpc:scale > 0",
+          "trigger:rpc:delete > 0",
+          "trigger:rpc:compute > 0",
+          "trigger:rpc:add > 0",
+          "overseer:event:service_updated > 0",
+          "\"metrics.exists\" in monitorer_rabbitmq:event:metrics_updated:params",
+          "monitorer_rabbitmq:rpc:track >= 1"
+        ]
+      },
+      "124b": {
+        "provide": {
+          "dependency_solver:rpc:solve_dependencies": 2,
+          "dependency_solver:rpc:solve_dependencies:args": [
+            "catalog",
+            "extra_constraints"
+          ],
+          "dependency_solver:rpc:solve_dependencies:rtype": [
+            "list[dict]"
+          ],
+          "dependency_solver:rpc:explain": 1,
+          "dependency_solver:rpc:explain:args": [
+            "catalog",
+            "extra_constraints"
+          ],
+          "dependency_solver:rpc:explain:rtype": [
+            "results"
+          ],
+          "upgrade_planer:event:new_version": 1,
+          "upgrade_planer:rpc:list_catalog": 1,
+          "upgrade_planer:rpc:explain_phase": 1,
+          "upgrade_planer:rpc:get_latest_phase": 1,
+          "upgrade_planer:rpc:run_available_upgrade": 1,
+          "upgrade_planer:rpc:continue_scheduled_plan": 1,
+          "upgrade_planer:rpc:resolve_upgrade_and_steps": 1,
+          "overseer:rpc": 1,
+          "overseer:rpc:scale": 1,
+          "overseer:rpc:monitor": 1,
+          "overseer:rpc:list_service": 1,
+          "overseer:rpc:get_service": 1,
+          "overseer:rpc:unmonitor_service": 1,
+          "overseer:rpc:test": 1,
+          "overseer:rpc:upgrade_service": 1,
+          "overseer:event:service_updated": 1,
+          "overseer:event:new_image": 1,
+          "load_manager:rpc:monitor_service": 1,
+          "load_manager:rpc:unmonitor_service": 1,
+          "load_manager:event:scale": 1,
+          "load_manager:event:scale:params": [
+            "scale",
+            "extra_constraints"
+          ],
+          "scaler_docker:http": 1,
+          "scaler_docker:event:service_updated": 1,
+          "scaler_docker:event:image_updated": 1,
+          "scaler_docker:rpc:update": 1,
+          "scaler_docker:rpc:get": 1,
+          "scaler_docker:rpc:list_services": 1,
+          "scaler_docker:rpc:fetch_image_config": 1,
+          "monitorer:rabbitmq": true,
+          "monitorer_rabbitmq:event:metrics_updated": 2,
+          "monitorer_rabbitmq:event:metrics_updated:params": [
+            "monitorer",
+            "identifier",
+            "metrics",
+            "metrics.exists",
+            "metrics.waiting",
+            "metrics.latency",
+            "metrics.rate",
+            "metrics.call_rate",
+            "metrics.exec_rate",
+            "metrics.consumers"
+          ],
+          "monitorer_rabbitmq:rpc:track": 1,
+          "monitorer_rabbitmq:rpc:track:args": [
+            "queue_identifier"
+          ],
+          "trigger:rpc:compute": 1,
+          "trigger:rpc:compute:args": [
+            "ruleset"
+          ],
+          "trigger:rpc:add": 1,
+          "trigger:rpc:add:args": [
+            "ruleset"
+          ],
+          "trigger:rpc:delete": 1,
+          "trigger:rpc:delete:args": [
+            "owner",
+            "rule_name"
+          ],
+          "trigger:rpc:purge": 1,
+          "trigger:rpc:purge:args": [
+            "owner"
+          ],
+          "trigger:rpc:list": 1,
+          "trigger:rpc:list:args": [
+            "_filter"
+          ],
+          "trigger:event:ruleset_triggered": 1,
+          "trigger:event:ruleset_triggered:params": [
+            "ruleset",
+            "rules_stats"
+          ],
+          "scaler_docker:rpc:dump": 1
+        },
+        "require": [
+          "dependency_solver:rpc:explain > 0",
+          "dependency_solver:rpc:solve_dependencies > 1",
+          "overseer:rpc:get_service > 0",
+          "overseer:rpc:upgrade_service > 0",
+          "overseer:event:service_updated > 0",
+          "overseer:event:new_image > 0",
+          "scaler_docker:rpc:fetch_image_config > 0",
+          "scaler_docker:rpc:list_services > 0",
+          "scaler_docker:rpc:update > 0",
+          "load_manager:rpc:monitor_service > 0",
+          "overseer:rpc:scale > 0",
+          "trigger:rpc:delete > 0",
+          "trigger:rpc:compute > 0",
+          "trigger:rpc:add > 0",
+          "overseer:event:service_updated > 0",
+          "\"metrics.exists\" in monitorer_rabbitmq:event:metrics_updated:params",
+          "monitorer_rabbitmq:rpc:track >= 1"
+        ]
+      }
+    }
+  },
+  {
+    "name": "gmd_joboffer_xml_publisher",
+    "versions": {
+      "0.1.81b": {
+        "provide": {
+          "joboffer_xml_publisher:rpc": 1,
+          "joboffer_xml_publisher:rpc:build_xml": 1,
+          "joboffer_xml_publisher:rpc:build_xml:args": [
+            "offers_raw"
+          ],
+          "joboffer_xml_publisher:rpc:build_xml:rtype": "str",
+          "joboffer_xml_publisher:rpc:publish": 1,
+          "joboffer_xml_publisher:rpc:publish:args": [
+            "offers_raw"
+          ],
+          "joboffer_xml_publisher:rpc:publish:rtype": "None",
+          "joboffer_xml_publisher:rpc:publish_brand": 1,
+          "joboffer_xml_publisher:rpc:publish_brand:args": [
+            "offers_raw",
+            "brand"
+          ],
+          "joboffer_xml_publisher:rpc:publish_brand:rtype": "None"
+        },
+        "require": []
+      },
+      "0.1.83b": {
+        "provide": {
+          "joboffer_xml_publisher:rpc": 1,
+          "joboffer_xml_publisher:rpc:build_xml": 1,
+          "joboffer_xml_publisher:rpc:build_xml:args": [
+            "offers_raw"
+          ],
+          "joboffer_xml_publisher:rpc:build_xml:rtype": "str",
+          "joboffer_xml_publisher:rpc:publish": 1,
+          "joboffer_xml_publisher:rpc:publish:args": [
+            "offers_raw"
+          ],
+          "joboffer_xml_publisher:rpc:publish:rtype": "None",
+          "joboffer_xml_publisher:rpc:publish_brand": 1,
+          "joboffer_xml_publisher:rpc:publish_brand:args": [
+            "offers_raw",
+            "brand"
+          ],
+          "joboffer_xml_publisher:rpc:publish_brand:rtype": "None"
+        },
+        "require": []
+      }
+    }
+  },
+  {
+    "name": "gmd_yupeeposting-backend",
+    "versions": {
+      "0.2.250b": {
+        "provide": {
+          "yupeeposting_backend:http": 1
+        },
+        "require": []
+      },
+      "0.2.251b": {
+        "provide": {
+          "yupeeposting_backend:http": 1
+        },
+        "require": []
+      },
+      "0.2.252b": {
+        "provide": {
+          "yupeeposting_backend:http": 1
+        },
+        "require": []
+      }
+    }
+  },
+  {
+    "name": "gmd_http_to_rpc",
+    "versions": {
+      "0.1.81b": {
+        "provide": {
+          "http_to_rpc:http": 1
+        },
+        "require": [
+          "joboffer_algolia_publisher:rpc > 0",
+          "joboffer_xml_publisher:rpc > 0",
+          "joboffer_fetcher:rpc > 0"
+        ]
+      },
+      "0.1.83b": {
+        "provide": {
+          "http_to_rpc:http": 1
+        },
+        "require": [
+          "joboffer_algolia_publisher:rpc > 0",
+          "joboffer_xml_publisher:rpc > 0",
+          "joboffer_fetcher:rpc > 0"
+        ]
+      }
+    }
+  },
+  {
+    "name": "gmd_yupeeposting-webui",
+    "versions": {
+      "0.2.251b": {
+        "provide": {
+          "yupeeposting_webui:http": 1
+        },
+        "require": [
+          "yupeeposting_backend:http > 0"
+        ]
+      },
+      "0.2.252b": {
+        "provide": {
+          "yupeeposting_webui:http": 1
+        },
+        "require": [
+          "yupeeposting_backend:http > 0"
+        ]
+      }
+    }
+  },
+  {
+    "name": "gmd_joboffer_fetcher",
+    "versions": {
+      "0.1.81b": {
+        "provide": {
+          "joboffer_fetcher:rpc": 1,
+          "joboffer_fetcher:rpc:fetch_offers": 1,
+          "joboffer_fetcher:rpc:fetch_offers:args": [],
+          "joboffer_fetcher:rpc:fetch_offers:rtype": [
+            {
+              "str": "str"
+            }
+          ],
+          "joboffer_fetcher:rpc:get_brands": 1,
+          "joboffer_fetcher:rpc:get_brands:args": [],
+          "joboffer_fetcher:rpc:get_brands:rtype": null,
+          "joboffer_fetcher:rpc:publish": 1,
+          "joboffer_fetcher:rpc:publish:args": [
+            "offers"
+          ],
+          "joboffer_fetcher:rpc:publish:rtype": null
+        },
+        "require": [
+          "joboffer_algolia_publisher:rpc:publish > 0",
+          "\"offers_raw\" in joboffer_algolia_publisher:rpc:publish:args"
+        ]
+      },
+      "0.1.83b": {
+        "provide": {
+          "joboffer_fetcher:rpc": 1,
+          "joboffer_fetcher:rpc:fetch_offers": 1,
+          "joboffer_fetcher:rpc:fetch_offers:args": [],
+          "joboffer_fetcher:rpc:fetch_offers:rtype": [
+            {
+              "str": "str"
+            }
+          ],
+          "joboffer_fetcher:rpc:get_brands": 1,
+          "joboffer_fetcher:rpc:get_brands:args": [],
+          "joboffer_fetcher:rpc:get_brands:rtype": null,
+          "joboffer_fetcher:rpc:publish": 1,
+          "joboffer_fetcher:rpc:publish:args": [
+            "offers"
+          ],
+          "joboffer_fetcher:rpc:publish:rtype": null
+        },
+        "require": [
+          "joboffer_algolia_publisher:rpc:publish > 0",
+          "\"offers_raw\" in joboffer_algolia_publisher:rpc:publish:args"
+        ]
+      }
+    }
+  },
+  {
+    "name": "gmd_joboffer_algolia_publisher",
+    "versions": {
+      "0.1.81b": {
+        "provide": {
+          "joboffer_algolia_publisher:rpc": 1,
+          "joboffer_algolia_publisher:rpc:publish": 1,
+          "joboffer_algolia_publisher:rpc:publish:args": [
+            "offers_raw"
+          ],
+          "joboffer_algolia_publisher:rpc:publish:rtype": [
+            {
+              "objectID": "str",
+              "city": "str",
+              "contractTypes": "str",
+              "title": "str",
+              "company": "str",
+              "brandId": "str",
+              "description": "str",
+              "profile": "str",
+              "publicationDate": "str",
+              "multipostingId": "str",
+              "reference": "str",
+              "applyEmail": "str",
+              "companyDescription": "str",
+              "jobofferAddressePostalCode": "str",
+              "jobLabel": "str",
+              "activityLabel": "str",
+              "jobFamillyLabel": "str",
+              "lat": "str",
+              "lng": "str"
+            }
+          ],
+          "joboffer_algolia_publisher:rpc:algolia_browse": 1,
+          "joboffer_algolia_publisher:rpc:algolia_browse:args": [],
+          "joboffer_algolia_publisher:rpc:algolia_browse:rtype": [
+            "dict"
+          ],
+          "joboffer_algolia_publisher:rpc:update": 1,
+          "joboffer_algolia_publisher:rpc:update:args": [
+            "offers_raw"
+          ],
+          "joboffer_algolia_publisher:rpc:update:rtype": [],
+          "joboffer_algolia_publisher:rpc:delete": 1,
+          "joboffer_algolia_publisher:rpc:delete:args": [
+            "offers_ids"
+          ],
+          "joboffer_algolia_publisher:rpc:delete:rtype": []
+        },
+        "require": []
+      },
+      "0.1.83b": {
+        "provide": {
+          "joboffer_algolia_publisher:rpc": 1,
+          "joboffer_algolia_publisher:rpc:publish": 1,
+          "joboffer_algolia_publisher:rpc:publish:args": [
+            "offers_raw"
+          ],
+          "joboffer_algolia_publisher:rpc:publish:rtype": [
+            {
+              "objectID": "str",
+              "city": "str",
+              "contractTypes": "str",
+              "title": "str",
+              "company": "str",
+              "brandId": "str",
+              "description": "str",
+              "profile": "str",
+              "publicationDate": "str",
+              "multipostingId": "str",
+              "reference": "str",
+              "applyEmail": "str",
+              "companyDescription": "str",
+              "jobofferAddressePostalCode": "str",
+              "jobLabel": "str",
+              "activityLabel": "str",
+              "jobFamillyLabel": "str",
+              "lat": "str",
+              "lng": "str"
+            }
+          ],
+          "joboffer_algolia_publisher:rpc:algolia_browse": 1,
+          "joboffer_algolia_publisher:rpc:algolia_browse:args": [],
+          "joboffer_algolia_publisher:rpc:algolia_browse:rtype": [
+            "dict"
+          ],
+          "joboffer_algolia_publisher:rpc:update": 1,
+          "joboffer_algolia_publisher:rpc:update:args": [
+            "offers_raw"
+          ],
+          "joboffer_algolia_publisher:rpc:update:rtype": [],
+          "joboffer_algolia_publisher:rpc:delete": 1,
+          "joboffer_algolia_publisher:rpc:delete:args": [
+            "offers_ids"
+          ],
+          "joboffer_algolia_publisher:rpc:delete:rtype": []
+        },
+        "require": []
+      }
+    }
+  },
+  {
+    "name": "gmd_wrapper_smsmode",
+    "versions": {
+      "0.1.84b": {
+        "provide": {},
+        "require": []
+      }
+    }
+  },
+  {
+    "name": "gmd_ce-backend",
+    "versions": {
+      "0.1.6": {
+        "provide": {
+          "ce_backend:http": 1
+        },
+        "require": []
+      },
+      "0.1.7": {
+        "provide": {
+          "ce_backend:http": 1
+        },
+        "require": []
+      },
+      "0.1.8": {
+        "provide": {
+          "ce_backend:http": 1
+        },
+        "require": []
+      },
+      "0.1.10": {
+        "provide": {
+          "ce_backend:http": 1
+        },
+        "require": []
+      },
+      "0.1.9": {
+        "provide": {
+          "ce_backend:http": 1
+        },
+        "require": []
+      },
+      "0.1.11": {
+        "provide": {
+          "ce_backend:http": 1
+        },
+        "require": []
+      },
+      "0.1.12": {
+        "provide": {
+          "ce_backend:http": 1
+        },
+        "require": []
+      },
+      "0.1.13": {
+        "provide": {
+          "ce_backend:http": 1
+        },
+        "require": []
+      },
+      "0.1.17": {
+        "provide": {
+          "ce_backend:http": 1
+        },
+        "require": []
+      },
+      "0.1.16": {
+        "provide": {
+          "ce_backend:http": 1
+        },
+        "require": []
+      },
+      "0.1.15": {
+        "provide": {
+          "ce_backend:http": 1
+        },
+        "require": []
+      },
+      "0.1.18": {
+        "provide": {
+          "ce_backend:http": 1
+        },
+        "require": []
+      },
+      "0.1.19": {
+        "provide": {
+          "ce_backend:http": 1
+        },
+        "require": []
+      },
+      "0.1.20": {
+        "provide": {
+          "ce_backend:http": 1
+        },
+        "require": []
+      },
+      "0.1.22": {
+        "provide": {
+          "ce_backend:http": 1
+        },
+        "require": []
+      },
+      "0.1.26": {
+        "provide": {
+          "ce_backend:http": 1
+        },
+        "require": []
+      },
+      "0.1.27": {
+        "provide": {
+          "ce_backend:http": 1
+        },
+        "require": []
+      },
+      "0.1.28": {
+        "provide": {
+          "ce_backend:http": 1
+        },
+        "require": []
+      }
+    }
+  },
+  {
+    "name": "gmd_yupeekce_backend",
+    "versions": {
+      "0.1.10": {
+        "provide": {
+          "ce_backend:http": 1
+        },
+        "require": []
+      }
+    }
+  },
+  {
+    "name": "gmd_yupeekce-backend",
+    "versions": {
+      "0.1.28": {
+        "provide": {
+          "ce_backend:http": 1
+        },
+        "require": []
+      }
+    }
+  },
+  {
+    "name": "gmd_yupeekce-webui",
+    "versions": {
+      "0.1.27": {
+        "provide": {
+          "ce_webui:http": 1
+        },
+        "require": [
+          "ce_backend:http > 0"
+        ]
+      },
+      "0.1.28": {
+        "provide": {
+          "ce_webui:http": 1
+        },
+        "require": [
+          "ce_backend:http > 0"
+        ]
+      }
+    }
+  }
+]
