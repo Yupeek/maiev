@@ -480,7 +480,8 @@ class TestUpgradePlaner(object):
         })
         bp = Phase([PhasePin(catalog[1], "1.0.16"),
                     PhasePin(catalog[0], "1.0.16")])
-        upgrade_planer.get_latest_phase = mock.Mock(return_value={catalog[1]['name']: "1.0.16", catalog[0]['name']: "1.0.16"})
+        upgrade_planer.get_latest_phase = mock.Mock(return_value={catalog[1]['name']: "1.0.16",
+                                                                  catalog[0]['name']: "1.0.16"})
         upgrade_planer.solve_best_phase = mock.Mock(return_value=(bp, 1))
         upgrade_planer.build_steps = mock.Mock()
 

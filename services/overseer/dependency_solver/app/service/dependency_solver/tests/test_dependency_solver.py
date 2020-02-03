@@ -333,7 +333,7 @@ class TestPerfRealData(object):
         assert result['anomalies'] == []
         assert result['errors'] == []
 
-    @pytest.skip("bad perfs prohibit this test")
+    @pytest.mark.skip("bad perfs prohibit this test")
     def test_solve_dependency_2(self, dependency_solver: DependencySolver):
         payload = self.load_sample('sample2.json')
         result = dependency_solver.solve_dependencies(payload)
