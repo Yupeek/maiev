@@ -1,10 +1,21 @@
 # -*- coding: utf-8 -*-
 import copy
+import json
 import logging
+import os
+import time
 
-from service.dependency_solver.dependency_solver import Solver
+import pytest
+
+from service.dependency_solver.dependency_solver import DependencySolver, Solver
 
 logger = logging.getLogger(__name__)
+
+
+@pytest.fixture
+def dependency_solver():
+    service = DependencySolver()
+    return service
 
 
 class TestSolver:
@@ -119,11 +130,7 @@ class TestSolver:
         ]
 
         for expected, solution in zip(expected_solutions, s.solve()):
-            res = tuple(
-                (service['name'], version)
-                for service, version in solution
-            )
-            assert expected == res
+            assert dict(expected) == solution
 
     def test_solve_extra1(self):
         s = Solver(self.CATALOG1, ("service1 == 2",))
@@ -132,11 +139,7 @@ class TestSolver:
         ]
 
         for expected, solution in zip(expected_solutions, s.solve()):
-            res = tuple(
-                (service['name'], version)
-                for service, version in solution
-            )
-            assert expected == res
+            assert dict(expected) == solution
 
     def test_solve_extra2(self):
         s = Solver(self.CATALOG1, ("service1:version == 1",))
@@ -145,11 +148,7 @@ class TestSolver:
         ]
 
         for expected, solution in zip(expected_solutions, s.solve()):
-            res = tuple(
-                (service['name'], version)
-                for service, version in solution
-            )
-            assert expected == res
+            assert dict(expected) == solution
 
     def test_solve_not_possible(self):
         s = Solver(self.CATALOG1, ("not service1",))
@@ -162,11 +161,7 @@ class TestSolver:
         ]
 
         for expected, solution in zip(expected_solutions, s.solve()):
-            res = tuple(
-                (service['name'], version)
-                for service, version in solution
-            )
-            assert expected == res
+            assert dict(expected) == solution
 
     def test_added_solution_insolvable(self):
         c = copy.deepcopy(self.CATALOG_INSOLVABLE)
@@ -185,11 +180,7 @@ class TestSolver:
         ]
 
         for expected, solution in zip(expected_solutions, s.solve()):
-            res = tuple(
-                (service['name'], version)
-                for service, version in solution
-            )
-            assert expected == res
+            assert dict(expected) == solution
 
     def test_complex_self_dependent(self):
         catalog = [{'name': 'maiev',
@@ -320,3 +311,67 @@ class TestExplain(object):
 
         result = list(s.solve())
         assert len(result) == 1
+
+
+class TestPerfRealData(object):
+    def load_sample(self, sample):
+        with open(os.path.join(os.path.dirname(__file__), 'samples', sample)) as f:
+            return json.load(f)
+
+    def test_solve_dependency_1(self, dependency_solver: DependencySolver):
+        payload = self.load_sample('sample1.json')
+        result = dependency_solver.solve_dependencies(*payload)
+        assert len(result['results']) == 96
+        assert result['results'][-1] == {
+            'http_to_rpc': '0.1.19',
+            'joboffer_algolia_publisher': '0.1.24',
+            'joboffer_fetcher': '0.1.22',
+            'joboffer_xml_publisher': '0.1.19',
+            'maiev': '1.2.0',
+            'yupeeposting-backend': '0.2.55',
+            'yupeeposting-webui': '0.2.56'}
+        assert result['anomalies'] == []
+        assert result['errors'] == []
+
+    @pytest.mark.skip("bad perfs prohibit this test")
+    def test_solve_dependency_2(self, dependency_solver: DependencySolver):
+        payload = self.load_sample('sample2.json')
+        result = dependency_solver.solve_dependencies(payload)
+        assert len(result['results']) == 96
+        assert result['results'][-1] == {
+            'http_to_rpc': '0.1.19',
+            'joboffer_algolia_publisher': '0.1.24',
+            'joboffer_fetcher': '0.1.22',
+            'joboffer_xml_publisher': '0.1.19',
+            'maiev': '1.2.0',
+            'yupeeposting-backend': '0.2.55',
+            'yupeeposting-webui': '0.2.56'}
+        assert result['anomalies'] == []
+        assert result['errors'] == []
+
+    def test_solve_dep_no_service(self):
+        catalog = self.load_sample('sample1.json')[0]
+        s = Solver(catalog, [], debug=True)
+        begin = time.time()
+        solved = list(s.solve())
+        end = time.time()
+
+        assert len(solved) == 96
+        assert solved[0] == {
+            'http_to_rpc': '0.1.19',
+            'joboffer_algolia_publisher': '0.1.24',
+            'joboffer_fetcher': '0.1.19',
+            'joboffer_xml_publisher': '0.1.24',
+            'maiev': '1.2.0',
+            'yupeeposting-backend': '0.2.62',
+            'yupeeposting-webui': '0.2.57'}
+        elapsed = end - begin
+        assert elapsed < 25
+
+    def test_solve_dep_memory_consumption(self):
+        catalog = self.load_sample('sample1.json')[0]
+        s = Solver(catalog, [], debug=True)
+        solved = list(s.solve())
+        assert len(solved) == 96
+        encoded = json.dumps(solved).encode('utf8')
+        assert len(encoded) < 1024 * 21  # 21k

@@ -2,12 +2,14 @@
 # -*- coding: utf-8 -*-
 
 import logging
+import time
 from functools import partial
 
 from booleano.exc import ScopeError
 from booleano.operations.variables import BooleanVariable, variable_symbol_table_builder
 from booleano.parser import Bind, Grammar, SymbolTable
 from booleano.parser.core import EvaluableParseManager
+from decorator import contextmanager
 from eventlet import greenthread
 from nameko.rpc import rpc
 
@@ -22,6 +24,20 @@ grammar = Grammar(**{
     "or": 'or',
     "not": "not",
 })
+
+
+@contextmanager
+def debug_time(logger, desc):
+    start = time.clock()
+    try:
+        yield
+    finally:
+        end = time.clock()
+        logger.debug("%s execution time: %ss", desc, end - start, exc_info={
+            'type': 'debug_time',
+            'desc': desc,
+            'duration': end - start
+        })
 
 
 def check_exists(context, service_name):
@@ -82,6 +98,7 @@ def complete_with_objects(root_table):
 
 
 class Solver(object):
+    MAX_BACKTRACK_SLEEP = 250
 
     def __init__(self, catalog, extra_constraints, debug=False):
         self.catalog = catalog
@@ -90,6 +107,7 @@ class Solver(object):
         self.debug = debug
         self.failed = []
         self.extra_constraints_compiled = []
+        self.backtrack_count = 0
 
     def compile_resolution(self):
         pass
@@ -158,39 +176,47 @@ class Solver(object):
         return res
 
     def solve(self):
-        symbol_table = self.compile_symbole_table()
-        conditions = self.compile_conditions(symbol_table)
+
+        with debug_time(logger, 'compile_symbole_table'):
+            symbol_table = self.compile_symbole_table()
+        with debug_time(logger, 'compile_conditions'):
+            conditions = self.compile_conditions(symbol_table)
         # condition service: version: [conditions]
         # first: we build the variables.
         variables = [
             # (servicename: str, versions: {provide: dict, require: condition})
         ]
-        for service in self.catalog:
-            variables.append(
-                (service, {
-                    number: {
-                        "provide": version['provide'],
-                        "require": conditions[service['name']][number]
-                    }
-                    for number, version in service["versions"].items()
-                    if number in conditions.get(service['name'], {})
-                })
-            )
         encountered_solutions = [
         ]
+        with debug_time(logger, 'setup_variables'):
+            for service in self.catalog:
+                variables.append(
+                    (service, {
+                        number: {
+                            "provide": version['provide'],
+                            "require": conditions[service['name']][number]
+                        }
+                        for number, version in service["versions"].items()
+                        if number in conditions.get(service['name'], {})
+                    })
+                )
+
         nb_possibilities = 1
         for _, versions in variables:
             nb_possibilities *= len(versions)
+
         logger.debug("solving %s possibilities using variables %r" % (nb_possibilities, variables))
-        for solution in self.backtrack(variables, [self.check_requirements, self.check_extra_constraints], []):
-            pined = {
-                pin[0]['name']: pin[1]
-                for pin in solution
-            }
-            if pined in encountered_solutions:
-                continue
-            encountered_solutions.append(pined)
-            yield solution
+        with debug_time(logger, 'backtrack'):
+            for solution in self.backtrack(variables, [self.check_requirements, self.check_extra_constraints], []):
+                pined = {
+                    pin[0]['name']: pin[1]
+                    for pin in solution
+                }
+                if pined in encountered_solutions:
+                    continue
+                encountered_solutions.append(pined)
+                yield pined
+        logger.debug("%d solutions found in %d backtrack", len(encountered_solutions), self.backtrack_count)
 
     def explain(self):
         """
@@ -244,7 +270,7 @@ class Solver(object):
                             "provided": provided
                         })
                     return False
-        except (ScopeError, KeyError) as e:
+        except ScopeError as e:
             if self.debug:
                 self.failed.append({
                     "expression": require.original_string,
@@ -256,6 +282,10 @@ class Solver(object):
                 "service": service['name'],
                 "error": repr(e)
             })
+            return False
+        except KeyError:
+            # keyerror mean the requirement is not provided yet, but it's not a scope
+            # error, so the requirement exists somewhere in the provide
             return False
         else:
             return True
@@ -291,7 +321,9 @@ class Solver(object):
     def backtrack(self, remaining_services, constraints, tmp_solution):
         if len(remaining_services) == 0:
             yield tmp_solution
-        greenthread.sleep(0)
+        self.backtrack_count += 1
+        if self.backtrack_count % self.MAX_BACKTRACK_SLEEP == 0:
+            greenthread.sleep(0)
         for i, (remaining_service, versions) in enumerate(remaining_services):
 
             for version_num, version in sorted(versions.items(), reverse=True):

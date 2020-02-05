@@ -10,6 +10,13 @@ help:
 	@grep -P '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
 
+test-dependencies:  ## run dependency solver for all scale config
+	jq -s '.'  $(shell find . -iname "scale.json")  | \
+		docker run \
+		-i --rm \
+		yupeek/maiev:dependency_solver-latest python /app/explain.py | \
+		jq .
+
 build-image: services/maiev-base $(SUBDIRS)  ## build all services
 
 all:   ## build all docker images, tools and etc

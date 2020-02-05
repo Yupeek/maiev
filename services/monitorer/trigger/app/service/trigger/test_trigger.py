@@ -8,6 +8,7 @@ import sys
 from unittest import TestCase
 
 import mock
+import pyparsing
 from nameko.testing.services import worker_factory
 from pymongo import MongoClient
 
@@ -360,7 +361,8 @@ class TestConputeResults(TriggerTestcase):
                 "pstr": 'rmq:rate < 0 & lol and rate < 0'
             }
         }
-        if sys.version_info > (3, 6, 6):
+
+        if pyparsing.__version__ > '2.4.0':
             expected['exception'] = "Expected end of text, found '&'  (at char 13), (line:1, col:14)"
         self.assertEqual(self.service.compute(ruleset), expected)
 

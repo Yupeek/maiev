@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
+import json
 import logging
+import os
+from functools import reduce
 
 import mock
 # other MS
@@ -95,8 +98,37 @@ def service():
 
 
 @pytest.fixture
+def catalog(service):
+    return [{
+        "name": "consumer",
+        "service": service['consumer'],
+        "versions_list": [
+            {"version": "1.0.16", "dependencies": {
+                "require": [
+                    "producer:rpc:echo"
+                ]
+            }}],
+
+        "version": service['consumer']['image']['image_info']['version'],
+    }, {
+        "name": "producer",
+        "service": service['producer'],
+        "versions_list": [
+            {"version": "1.0.16", "dependencies": {
+                "provide": {
+                    "producer:rpc:echo": 1
+                }}}
+        ],
+        "version": service['producer']['image']['image_info']['version'],
+
+    }
+    ]
+
+
+@pytest.fixture
 def upgrade_planer():
     service = UpgradePlaner()
+    service.config = {}
     service.mongo = mock.Mock()
     service.dispatch = mock.Mock()
     service.dependency_solver = mock.Mock()
@@ -104,6 +136,7 @@ def upgrade_planer():
 
 
 class TestUpgradePlaner(object):
+
     def test_update_catalog_new_service(self, event_payload, upgrade_planer: UpgradePlaner):
         upgrade_planer.mongo.catalog.find_one.return_value = None
         upgrade_planer.on_new_version(event_payload)
@@ -400,6 +433,82 @@ class TestUpgradePlaner(object):
             }
         ]
 
+    def test_resolve_upgrade_and_steps_no_goal(self, upgrade_planer: UpgradePlaner, catalog):
+        upgrade_planer.build_catalog = mock.Mock(return_value=catalog)
+        upgrade_planer.dependency_solver.solve_dependencies = mock.Mock(return_value={
+            "results": [{"producer": "1.0.16", "consumer": "1.0.16"}],
+            "errors": [],
+            "anomalies": []
+        })
+        bp = Phase([PhasePin(catalog[1], "1.0.16"),
+                    PhasePin(catalog[0], "1.0.16")])
+        upgrade_planer.solve_best_phase = mock.Mock(return_value=(None, 0))
+        upgrade_planer.build_steps = mock.Mock()
+
+        res = upgrade_planer.resolve_upgrade_and_steps()
+
+        upgrade_planer.solve_best_phase.assert_called_with([bp])
+        assert not upgrade_planer.build_steps.called
+        assert res['result']['best_phase'] is None
+
+    def test_resolve_upgrade_and_steps_with_goal(self, upgrade_planer: UpgradePlaner, catalog):
+        upgrade_planer.build_catalog = mock.Mock(return_value=catalog)
+        upgrade_planer.dependency_solver.solve_dependencies = mock.Mock(return_value={
+            "results": [{"producer": "1.0.16", "consumer": "1.0.16"}],
+            "errors": [],
+            "anomalies": []
+        })
+        bp = Phase([PhasePin(catalog[1], "1.0.16"),
+                    PhasePin(catalog[0], "1.0.16")])
+        upgrade_planer.solve_best_phase = mock.Mock(return_value=(bp, 1))
+        upgrade_planer.build_steps = mock.Mock()
+
+        res = upgrade_planer.resolve_upgrade_and_steps()
+
+        upgrade_planer.solve_best_phase.assert_called_with([bp])
+        upgrade_planer.build_steps.assert_called_with(bp)
+
+        assert res['result']['best_phase'] == bp
+
+    def test_resolve_upgrade_and_steps_with_resolution_disabled(self, upgrade_planer: UpgradePlaner, catalog):
+        upgrade_planer.config['solve_dependencies'] = False
+        upgrade_planer.build_catalog = mock.Mock(return_value=catalog)
+        upgrade_planer.dependency_solver.solve_dependencies = mock.Mock(return_value={
+            "results": [],
+            "errors": [],
+            "anomalies": []
+        })
+        bp = Phase([PhasePin(catalog[1], "1.0.16"),
+                    PhasePin(catalog[0], "1.0.16")])
+        upgrade_planer.get_latest_phase = mock.Mock(return_value={catalog[1]['name']: "1.0.16",
+                                                                  catalog[0]['name']: "1.0.16"})
+        upgrade_planer.solve_best_phase = mock.Mock(return_value=(bp, 1))
+        upgrade_planer.build_steps = mock.Mock()
+
+        res = upgrade_planer.resolve_upgrade_and_steps()
+
+        upgrade_planer.solve_best_phase.assert_called_with([bp])
+        upgrade_planer.build_steps.assert_called_with(bp)
+        upgrade_planer.dependency_solver.solve_dependencies.assert_not_called()
+
+        assert res['result']['best_phase'] == bp
+
+    def test_resolve_upgrade_and_steps_with_error(self, upgrade_planer: UpgradePlaner, catalog):
+        upgrade_planer.build_catalog = mock.Mock(return_value=catalog)
+        upgrade_planer.dependency_solver.solve_dependencies = mock.Mock(return_value={
+            "results": [],
+            "errors": ["ceci est une erreur"],
+            "anomalies": []
+        })
+
+        res = upgrade_planer.resolve_upgrade_and_steps()
+
+        print(res)
+        assert res == {
+            'result': None,
+            'errors': {'step': 'dependency_solve', 'error': ['ceci est une erreur'], 'catalog': catalog}
+        }
+
 
 class TestStepComputing(object):
 
@@ -591,7 +700,6 @@ class TestSolveBestPhase(object):
         assert goal == [[{"name": "producer", }, "1.0.1"], [{"name": "consumer", }, "1.0.17"]]
 
     def test_get_latest_phase(self, upgrade_planer: UpgradePlaner):
-
         upgrade_planer.mongo.catalog.find.return_value = [
             {"name": "producer", "versions_list": self.build_catalog("producer", ["1.0.5", "1.0.16", "1.0.17"])},
             {"name": "consumer", "versions_list": self.build_catalog("consumer", ["1.0.5", "1.0.17"])},
@@ -601,7 +709,6 @@ class TestSolveBestPhase(object):
         assert {"producer": "1.0.17", "consumer": "1.0.17"} == s
 
     def test_get_latest_phase_beta(self, upgrade_planer: UpgradePlaner):
-
         upgrade_planer.mongo.catalog.find.return_value = [
             {"name": "producer", "versions_list": self.build_catalog("producer", ["1.0.5", "1.0.16b", "1.0.17"])},
             {"name": "consumer", "versions_list": self.build_catalog("consumer", ["1.0.5", "1.0.17b"])},
@@ -609,3 +716,56 @@ class TestSolveBestPhase(object):
 
         s = upgrade_planer.get_latest_phase()
         assert {"producer": "1.0.17", "consumer": "1.0.17b"} == s
+
+    def test_get_latest_phase_beta_real(self, upgrade_planer: UpgradePlaner):
+        upgrade_planer.mongo.catalog.find.return_value = [
+            {"name": "producer", "versions_list": self.build_catalog(
+                "producer", ['1.1-93b', '1.1-79b', '1.1-73b', '1.1-77b', '1.1-78b', '1.1-71b', '1.1-87b', '1.1-64b',
+                             '1.1-89b', '1.1-84b', '1.1-86b', '1.1-65b', '1.1-88b', '1.1-96b', '1.1-97b', '1.1-98b',
+                             '1.1-99b', '1.1-100b', '1.1-101b', '1.1-103b', '1.1-104b', '1.1-106b', '1.1-107b',
+                             '1.1-108b', '1.3.0-110b', '1.3.0-114b', '1.3.0-119b'])},
+            {"name": "consumer", "versions_list": self.build_catalog("consumer", ["1.0.5", "1.0-17b"])},
+        ]
+
+        s = upgrade_planer.get_latest_phase()
+        assert {"producer": "1.3.0-119b", "consumer": "1.0.5"} == s
+
+    def test_sort_version(self, upgrade_planer: UpgradePlaner):
+        versions = ['1.1.4-108b', '1.3.0-110b', '1.3.0-114b', '1.3.0-119b']
+        sorted_v = upgrade_planer.sort_versions(self.build_catalog("producer", versions))
+        assert sorted_v == ['1.3.0-119b', '1.3.0-114b', '1.3.0-110b', '1.1.4-108b']
+
+    def test_sort_mixed_version(self, upgrade_planer: UpgradePlaner):
+        versions = ['1.1.4.108b', '1.3.0.110b', '1.3.0.114b', '1.3.0.119b', '1.3.1-120b', '1.3.1-125b']
+        sorted_v = upgrade_planer.sort_versions(self.build_catalog("producer", versions))
+
+        assert sorted_v == ['1.3.1-125b', '1.3.1-120b', '1.3.0.110b', '1.3.0.114b', '1.3.0.119b', '1.1.4.108b']
+
+
+class TestPerfRealData(object):
+
+    def load_sample(self, sample):
+        with open(os.path.join(os.path.dirname(__file__), 'samples', sample)) as f:
+            return json.load(f)
+
+    def test_sample1_get_latest(self, upgrade_planer: UpgradePlaner):
+        upgrade_planer.mongo.catalog.find.return_value = self.load_sample('sample1.json')['catalog']
+        s = upgrade_planer.get_latest_phase()
+        assert s == {
+            'http_to_rpc': '0.1.24',
+            'joboffer_algolia_publisher': '0.1.24',
+            'joboffer_fetcher': '0.1.24',
+            'joboffer_xml_publisher': '0.1.24',
+            'maiev': '1.3.0',
+            'yupeeposting-backend': '0.2.65',
+            'yupeeposting-webui': '0.2.64'}
+
+    def test_sample1_build_catalog(self, upgrade_planer: UpgradePlaner):
+        upgrade_planer.mongo.catalog.find.return_value = self.load_sample('sample1.json')['catalog']
+        catalog = upgrade_planer.build_catalog()
+
+        total = reduce(lambda a, b: a * b, (len(service['versions']) for service in catalog), 1)
+        assert total == 8640
+        reduced = upgrade_planer.reduce_catalog(catalog)
+        total_reduced = reduce(lambda a, b: a * b, (len(service['versions']) for service in reduced), 1)
+        assert total_reduced == 32

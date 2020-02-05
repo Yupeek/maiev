@@ -3,13 +3,13 @@
   "max": 1,
   "dependencies": {
     "provide": {
-      "dependency_solver:rpc:solve_dependencies": 1,
+      "dependency_solver:rpc:solve_dependencies": 2,
       "dependency_solver:rpc:solve_dependencies:args": [
         "catalog",
         "extra_constraints"
       ],
       "dependency_solver:rpc:solve_dependencies:rtype": [
-        "list"
+        "list[dict]"
       ],
       "dependency_solver:rpc:explain": 1,
       "dependency_solver:rpc:explain:args": [
@@ -98,7 +98,7 @@
     },
     "require": [
       "dependency_solver:rpc:explain > 0",
-      "dependency_solver:rpc:solve_dependencies > 0",
+      "dependency_solver:rpc:solve_dependencies > 1",
       "overseer:rpc:get_service > 0",
       "overseer:rpc:upgrade_service > 0",
       "overseer:event:service_updated > 0",

@@ -182,6 +182,23 @@ class TestImageVersion(TestCase):
         self.assertFalse(
             self.create_iv('overseer-3.1.9+build1') > self.create_iv('overseer-3.1.9')
         )
+        self.assertTrue(
+            self.create_iv('producer-1.3.0-110b') < self.create_iv('producer-1.3.0-119b')
+        )
+
+    def test_mixed_versions(self):
+        self.assertTrue(
+            self.create_iv('producer-1.3.0.110b') < self.create_iv('producer-1.3.0-119b')
+        )
+        self.assertTrue(
+            self.create_iv('producer-1.3.0-110b') > self.create_iv('producer-1.3.0.119b')
+        )
+        self.assertTrue(
+            self.create_iv('producer-1.1.108b') < self.create_iv('producer-1.3.0.119b')
+        )
+        self.assertTrue(
+            self.create_iv('producer-1.1.108b') < self.create_iv('producer-1.3.0-119b')
+        )
 
     def test_latest_equality(self):
         # the default behavior is to treat latest tages as special version

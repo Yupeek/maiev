@@ -573,7 +573,16 @@ class UpgradePlaner(BaseWorkerService):
              catalog: $catalog
         """
         catalog = self.build_catalog()
-        solved_phases = self.dependency_solver.solve_dependencies(catalog)
+        if self.config.get('solve_dependencies', True):
+            # feature realy cpu heavy and algo is O(n**n) :(
+            solved_phases = self.dependency_solver.solve_dependencies(catalog)
+        else:
+            # workaround for hanging resolution
+            solved_phases = {
+                "results": [self.get_latest_phase()],
+                "errors": [],
+                "anomalies": []
+            }
         """
         phase is the result of a solved state. it contains the list of possible states.
         each states is a list of tuple with a service and his pined version.
@@ -587,7 +596,15 @@ class UpgradePlaner(BaseWorkerService):
                     "catalog": catalog
                 }
             }
-        phases = [Phase.deserialize(phase) for phase in solved_phases['results']]
+        services_by_names = {
+            service['name']: service
+            for service in catalog
+        }
+
+        phases = [
+            Phase.deserialize([(services_by_names[k], v) for k, v in phase.items()])
+            for phase in solved_phases['results']
+        ]
         logger.debug("resolved phases : %s", phases)
         goal, rank = self.solve_best_phase(phases)  # type: Phase[PhasePin], int
         """
@@ -690,6 +707,18 @@ class UpgradePlaner(BaseWorkerService):
                 logger.warning("all %d versions was filtered out by filter %s for service %s",
                                len(service['versions']), filter_name, service['name'])
         return res
+
+    def reduce_catalog(self, catalog):
+        for service in catalog:
+            versions = []
+            known_req = []
+            for version_number, version_metadata in sorted(service['versions'].items(), key=lambda v: v[0]):
+                if version_metadata not in known_req:
+                    versions.append((version_number, version_metadata))
+                    known_req.append(version_metadata)
+
+            service['versions'] = dict(versions)
+        return catalog
 
     def solve_best_phase(self, phases):
         """
