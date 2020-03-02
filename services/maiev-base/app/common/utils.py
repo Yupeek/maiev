@@ -2,8 +2,8 @@
 
 import datetime
 import logging
-import re
 import types
+import regex
 from functools import partial, wraps
 
 import eventlet
@@ -133,7 +133,7 @@ class ImageVersion(object):
 
     """
     _VERSION_REGEXP = r'(\d+)(?:\.(\d+)(?:\.(\d+))?)?(?:([0-9a-zA-Z.]*))?(?:\+([0-9a-zA-Z.]*))?'
-    tag_regex = re.compile('^((?P<version>%s|latest)|-|(?P<species>[a-zA-Z_]+))+$' % _VERSION_REGEXP)
+    tag_regex = regex.compile('^((?P<version>%s|latest)|-|(?P<species>[a-zA-Z_]+))+$' % _VERSION_REGEXP)
     """
     the rexexp to parse the tage: see https://regex101.com/r/o2hr5V/3
     """
@@ -185,7 +185,10 @@ class ImageVersion(object):
         if tag is not None:
             parsed_raw = cls.tag_regex.match(tag)
             if parsed_raw:
-                result.update(parsed_raw.groupdict())
+                result.update({
+                    k: '-'.join(v)
+                    for k, v in parsed_raw.capturesdict().items()}
+                )
         return result
 
     def is_same_image(self, other):
