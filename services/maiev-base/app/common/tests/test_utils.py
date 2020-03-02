@@ -18,7 +18,7 @@ class TestImageVersion(TestCase):
         :return:
         """
         iv = self.create_iv(*hints)
-        self.assertEqual({k: v for k, v in iv.data.items() if k in result}, result)
+        self.assertEqual(result, {k: v for k, v in iv.data.items() if k in result})
 
     def create_iv(self, *hints):
         final_hints = {
@@ -71,6 +71,10 @@ class TestImageVersion(TestCase):
         self.assert_parsed_equal('overseer-1.0.69a1+build45', version="1.0.69a1+build45", species='overseer')
         self.assert_parsed_equal('overseer-1.0.69a1', version="1.0.69a1", species='overseer')
         self.assert_parsed_equal('overseer-1.0.69+build43', version="1.0.69+build43", species='overseer')
+
+    def test_detect_composed_species(self):
+        # specific
+        self.assert_parsed_equal('load_manager-release-1.3.1', version='1.3.1', species='load_manager-release')
 
     def test_full_parse(self):
         self.assert_parsed_equal('alpine', 'python', 'localhost', version=None, image='python',
