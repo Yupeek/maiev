@@ -1,6 +1,6 @@
 
 booleano==1.1a1
-eventlet==0.21.0
+eventlet==0.31.0
 nameko-serializer>=1.0.0,<1.99
 ipython
 nameko==2.12.0
