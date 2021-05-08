@@ -2,7 +2,7 @@
 booleano==1.1a1
 docker
 docker-registry-client==0.5.2
-eventlet==0.21.0
+eventlet==0.31.0
 flake8==3.3.0
 ipython
 isort
